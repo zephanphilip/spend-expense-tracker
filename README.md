@@ -2,6 +2,8 @@
 
 Mobile-first expense tracker: Next.js 16 · TypeScript · Tailwind v4 · shadcn/ui · Firebase Auth · Cloud Firestore.
 Architecture, data model, indexes and rules rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+iPhone Quick Add (`/quick-add`), Back Tap / Shortcuts setup, and what a PWA can and can't do on
+iOS (incl. Dynamic Island): [`docs/ios-quick-add.md`](docs/ios-quick-add.md).
 
 **Phase 1:** fast expense entry, categories, history/search/filters, dashboard, PWA.
 **Phase 2:** monthly & category budgets (rolling forward, history), income (one-time + recurring),

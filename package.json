@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "firebase emulators:start --only hosting --project demo-ledger",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore --project demo-ledger 'vitest run --config vitest.rules.config.mts'",
     "icons": "node scripts/generate-icons.mjs",

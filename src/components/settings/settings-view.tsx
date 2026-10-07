@@ -11,6 +11,7 @@ import { fieldA11y, FormField } from "@/components/common/form-field";
 import { PageHeader } from "@/components/common/page-header";
 import { UserAvatar } from "@/components/layout/user-avatar";
 import { ReminderSettings } from "@/components/settings/reminder-settings";
+import { QuickAddSettings } from "@/components/settings/quick-add-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { settleQuickly } from "@/lib/async";
@@ -49,6 +50,8 @@ export function SettingsView() {
         {/* Remount when the profile arrives so the form starts from saved values. */}
         <ProfileForm key={`${name}:${currency}`} uid={user.uid} defaults={{ displayName: name, currency }} />
       </section>
+
+      <QuickAddSettings />
 
       <AppearanceSection />
 

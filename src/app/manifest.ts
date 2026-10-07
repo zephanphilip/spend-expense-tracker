@@ -21,12 +21,14 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
+    // Long-press shortcuts on Android / desktop Chrome & Edge. iOS ignores this field; there,
+    // Quick Add is reached via Shortcuts / Back Tap or "Open the app into Quick Add".
     shortcuts: [
       {
-        name: "Add expense",
-        short_name: "Add",
-        description: "Log an expense in seconds",
-        url: "/dashboard?add=expense",
+        name: "Quick Add expense",
+        short_name: "Quick Add",
+        description: "Amount, category, done",
+        url: "/quick-add",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
       {
