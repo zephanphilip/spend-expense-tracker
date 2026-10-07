@@ -52,7 +52,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider>
           <AuthProvider>
             {children}
-            <Toaster position="top-center" richColors closeButton />
+            <Toaster
+              position="top-center"
+              richColors
+              closeButton
+              // Keep toasts below the status bar / Dynamic Island in the installed app.
+              mobileOffset={{ top: "max(16px, calc(env(safe-area-inset-top) + 8px))" }}
+            />
           </AuthProvider>
         </ThemeProvider>
         <ServiceWorkerRegistrar />

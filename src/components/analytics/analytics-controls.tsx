@@ -150,7 +150,7 @@ export function FilterButton({
           ) : null}
           <p className="text-xs text-muted-foreground">Filters combine (e.g. Food AND Credit). Filtered views read individual expenses for the period only.</p>
         </div>
-        <div className="flex gap-2 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6">
+        <div className="flex gap-2 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] keyboard:pb-3 md:px-6 md:pb-6">
           <Button variant="outline" className="h-12 flex-1 rounded-xl text-base" onClick={() => onChange(NO_FILTERS)} disabled={!hasFilters(value)}>
             Reset
           </Button>

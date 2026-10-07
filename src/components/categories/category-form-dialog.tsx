@@ -45,7 +45,7 @@ export function CategoryFormDialog({ open, onOpenChange, category, onSaved }: Ca
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* On phones, pin to the top so the keyboard never covers the form. */}
-      <DialogContent className="top-[max(1rem,env(safe-area-inset-top))] max-h-[calc(100dvh-2rem)] translate-y-0 overflow-y-auto sm:top-1/2 sm:max-w-md sm:-translate-y-1/2">
+      <DialogContent className="top-[max(1rem,env(safe-area-inset-top))] max-h-[calc(100dvh-max(1rem,env(safe-area-inset-top))-1rem)] translate-y-0 overflow-y-auto sm:top-1/2 sm:max-w-md sm:-translate-y-1/2">
         {open ? (
           <CategoryForm
             category={category}

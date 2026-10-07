@@ -3,6 +3,8 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+/* While the on-screen keyboard is open (see useKeyboardInset): no home-indicator padding. */
+@custom-variant keyboard (&:where([data-keyboard] *));
 
 @theme inline {
   --color-background: var(--background);

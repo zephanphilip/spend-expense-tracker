@@ -113,7 +113,7 @@ test("quick add deep link, keyboard help, reminders and offline banner", async (
   await context.setOffline(true);
   await expect(page.getByText(/Offline — changes are saved on this device/)).toBeVisible();
   await context.setOffline(false);
-  await expect(page.getByText("Back online")).toBeVisible();
+  await expect(page.getByText("Back online", { exact: true })).toBeVisible();
 });
 
 test("desktop keyboard shortcuts", async ({ page }) => {
@@ -150,5 +150,5 @@ test("offline app shell: installed app reopens offline with cached data (product
   await addExpense(page, { amount: "50", category: "Transport", note: "Offline add" });
   await expect(page.getByRole("region", { name: /Spent in/ })).toContainText("₹371");
   await context.setOffline(false);
-  await expect(page.getByText("Back online")).toBeVisible();
+  await expect(page.getByText("Back online", { exact: true })).toBeVisible();
 });

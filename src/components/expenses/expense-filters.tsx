@@ -197,7 +197,7 @@ export function ExpenseFilters({ value, onChange }: ExpenseFiltersProps) {
             </div>
           </fieldset>
         </div>
-        <div className="flex gap-2 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6">
+        <div className="flex gap-2 border-t px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] keyboard:pb-3 md:px-6 md:pb-6">
           <Button
             type="button"
             variant="outline"
