@@ -9,7 +9,13 @@ import { SwitchField } from "@/components/common/switch-field";
 import { Button } from "@/components/ui/button";
 import { useLocalPreference } from "@/hooks/use-local-preference";
 import { quickAddUrl } from "@/lib/quick-add/deep-link";
-import { DEFAULT_QUICK_ADD_PREFS, homeScreenAppUrl, QUICK_ADD_PREFS_KEY, type QuickAddPreferences } from "@/lib/quick-add/preferences";
+import {
+  DEFAULT_QUICK_ADD_PREFS,
+  homeScreenAppUrl,
+  isStandalone,
+  QUICK_ADD_PREFS_KEY,
+  type QuickAddPreferences,
+} from "@/lib/quick-add/preferences";
 
 const noop = () => () => {};
 
@@ -39,6 +45,8 @@ export function QuickAddSettings() {
   const origin = useSyncExternalStore(noop, () => window.location.origin, () => "");
   const url = origin ? quickAddUrl({}, origin) : "";
   const appUrl = origin ? homeScreenAppUrl(origin) : "";
+  // Safari and the Home Screen app keep separate settings; this one only matters in the app.
+  const standalone = useSyncExternalStore(noop, isStandalone, () => true);
   const update = (patch: Partial<QuickAddPreferences>) => setPrefs({ ...prefs, ...patch });
 
   return (
@@ -56,7 +64,11 @@ export function QuickAddSettings() {
         <SwitchField
           id="qa-launch"
           label="Open the app into Quick Add"
-          description="Opening Spend from the Home Screen or a Back Tap shortcut starts on Quick Add."
+          description={
+            standalone
+              ? "Opening Spend from the Home Screen or a Back Tap shortcut starts on Quick Add."
+              : "You're in the browser — open Spend from your Home Screen and turn this on there (each keeps its own settings)."
+          }
           checked={prefs.launchOnOpen}
           onCheckedChange={(launchOnOpen) => update({ launchOnOpen })}
         />

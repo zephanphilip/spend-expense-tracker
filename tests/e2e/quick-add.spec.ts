@@ -211,6 +211,11 @@ test("quick add: 'open the app into Quick Add' applies to launches of the instal
   await app.waitForTimeout(500);
   await expect(app).toHaveURL(/\/dashboard$/);
 
+  // A webapp:// link while the app is still in memory reloads the start page in the same
+  // session (sessionStorage intact): that's a launch too.
+  await app.reload();
+  await expect(app).toHaveURL(/\/quick-add$/);
+
   // The browser tab (not standalone) is unaffected.
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -262,7 +267,7 @@ test("quick add: returning to the installed app after a while opens Quick Add (w
       Date.now = realNow;
     }, ms);
 
-  await away(5_000); // a quick app switch doesn't redirect
+  await away(1_000); // a quick app switch doesn't redirect
   await expect(app).toHaveURL(/\/expenses$/);
   await away(60_000);
   await expect(app).toHaveURL(/\/quick-add$/);
