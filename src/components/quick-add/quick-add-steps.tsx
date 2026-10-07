@@ -185,13 +185,13 @@ export function CategoryStep({
           />
         </div>
       </div>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))]">
         {!needle && recent.length > 0 ? (
           <section aria-labelledby="recent-title" className="space-y-2 short:hidden">
             <h2 id="recent-title" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Recent
             </h2>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
               {recent.map((c) => (
                 <button
                   key={c.id}
@@ -308,7 +308,7 @@ export function PaymentStep({
   const methods = useMemo(() => rankPaymentMethods(usage, now), [usage, now]);
   const hasHistory = Object.keys(usage.methods).length > 0;
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-center gap-5 overflow-y-auto px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="flex min-h-0 flex-1 flex-col justify-center gap-5 overflow-x-hidden overflow-y-auto px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <StepTitle id="step-title" hint={oneTapSave ? "Tap to save" : undefined}>
         Paid with
       </StepTitle>
@@ -385,7 +385,7 @@ export function ConfirmStep({
   const edit = saving ? undefined : onEdit;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-5 overflow-y-auto px-[max(1rem,env(safe-area-inset-left))]">
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-5 overflow-x-hidden overflow-y-auto px-[max(1rem,env(safe-area-inset-left))]">
         <button
           type="button"
           onClick={edit ? () => edit("AMOUNT") : undefined}
@@ -466,7 +466,7 @@ export function ResultStep({
   const otherMonth = month !== monthKey(new Date());
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-[max(1rem,env(safe-area-inset-left))] text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-x-hidden overflow-y-auto px-[max(1rem,env(safe-area-inset-left))] text-center">
         <div className="flex flex-col items-center gap-3">
           <span
             className={cn(

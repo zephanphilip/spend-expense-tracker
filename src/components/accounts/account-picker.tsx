@@ -45,7 +45,7 @@ export function AccountPicker({ name, label, value, onChange, allowNone = true, 
   return (
     <fieldset className={className}>
       <legend className="mb-2 text-sm font-medium text-muted-foreground">{label}</legend>
-      <div role="radiogroup" aria-label={label} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      <div role="radiogroup" aria-label={label} className="-mx-4 -my-1 flex scroll-px-4 gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] md:-mx-6 md:scroll-px-6 md:px-6">
         {allowNone ? (
           <label className={cn(chip(value === ""), "pl-3")}>
             <input type="radio" name={name} value="" checked={value === ""} onChange={() => onChange("")} className="sr-only" />

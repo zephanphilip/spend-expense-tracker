@@ -31,7 +31,7 @@ export function ReminderBell({ reminders, className }: { reminders: Reminder[]; 
         ) : null}
       </Button>
       <ResponsiveModal open={open} onOpenChange={setOpen} title="Reminders" preventAutoFocus>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] keyboard:pb-4 md:px-6 md:pb-6">
+        <div className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] keyboard:pb-4 md:px-6 md:pb-6">
           {reminders.length === 0 ? (
             <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
               <CalendarClock className="size-5" aria-hidden />

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 /** Scrollable body of a form inside a ResponsiveModal. */
 export function SheetBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pt-2 pb-4 md:px-6", className)}>
+    <div className={cn("min-h-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto overscroll-contain px-5 pt-2 pb-4 md:px-6", className)}>
       {children}
     </div>
   );

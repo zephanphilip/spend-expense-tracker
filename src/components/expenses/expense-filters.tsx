@@ -117,7 +117,7 @@ export function ExpenseFilters({ value, onChange }: ExpenseFiltersProps) {
       ) : null}
 
       <ResponsiveModal open={open} onOpenChange={setOpen} title="Filters" preventAutoFocus>
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 pt-2 pb-4 md:px-6">
+        <div className="min-h-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-5 pt-2 pb-4 md:px-6">
           <fieldset>
             <legend className="mb-2.5 text-sm font-medium text-muted-foreground">Period</legend>
             <div className="flex flex-wrap gap-2">

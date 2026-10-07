@@ -54,7 +54,7 @@ export function DateTimeField({
               // input still opens on tap.
             }
           }}
-          className="absolute inset-0 cursor-pointer appearance-none opacity-0"
+          className="absolute inset-0 min-h-0 cursor-pointer appearance-none opacity-0"
         />
       </div>
       {showResetToNow ? (

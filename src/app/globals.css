@@ -161,6 +161,28 @@
   body {
     overscroll-behavior-y: none;
   }
+  /* Fieldsets default to `min-width: min-content`, so a horizontally scrolling chip row inside
+     one (e.g. the account picker) stretches the whole sheet instead of scrolling on its own. */
+  fieldset {
+    min-width: 0;
+  }
+  /* iOS Safari gives native date/time inputs an intrinsic min-width (they burst out of
+     two-column grids), centres their value and collapses them when empty. */
+  input:is([type="date"], [type="month"], [type="time"], [type="datetime-local"]) {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    min-height: 2.75rem;
+    text-align: left;
+  }
+  input::-webkit-date-and-time-value {
+    text-align: left;
+  }
+  /* Visually-hidden radios/checkboxes are absolutely positioned: anchor them to their label
+     chip so focusing one never scrolls an outer container sideways. */
+  label:has(> input.sr-only) {
+    position: relative;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
