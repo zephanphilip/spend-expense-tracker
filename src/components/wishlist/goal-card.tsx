@@ -12,12 +12,13 @@ import { CATEGORY_COLORS } from "@/lib/constants/colors";
 import { goalProgress } from "@/lib/finance/goals";
 import { cn } from "@/lib/utils";
 import type { Goal } from "@/types";
+import { routes } from "@/lib/routes";
 
 export function GoalCard({ goal, onAdd, compact = false }: { goal: Goal; onAdd?: (goal: Goal) => void; compact?: boolean }) {
   const p = goalProgress(goal);
   return (
     <li className={cn("rounded-3xl border bg-card", compact ? "p-3" : "p-4")}>
-      <Link href={`/wishlist/${goal.id}`} className="flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+      <Link href={routes.goal(goal.id)} className="flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         <CategoryIcon category={goal} />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{goal.name}</span>

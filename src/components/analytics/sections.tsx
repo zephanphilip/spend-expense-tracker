@@ -35,6 +35,7 @@ import { ChartCard } from "./chart-card";
 import { BarList, ChangeChip, Donut, Heatmap, IncomeExpenseBars, LineSeries, SimpleBars, StackedCategoryBars, TrendChart } from "./charts";
 import { KIND_COLORS, METHOD_COLORS, OTHER_COLOR, SERIES } from "./palette";
 import type { useAnalyticsModel } from "./use-analytics-model";
+import { routes } from "@/lib/routes";
 
 type Model = ReturnType<typeof useAnalyticsModel>["model"];
 interface SectionProps {
@@ -462,7 +463,7 @@ export function WealthSection({ model: m, netWorth }: SectionProps & { netWorth:
               return (
                 <li key={g.id} className="space-y-1">
                   <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <Link href={`/wishlist/${g.id}`} className="truncate hover:underline">{g.name}</Link>
+                    <Link href={routes.goal(g.id)} className="truncate hover:underline">{g.name}</Link>
                     <span className="shrink-0 tabular-nums">
                       <Money amount={g.savedAmount} /> / <Money amount={g.targetAmount} /> · {p.percent}%
                     </span>

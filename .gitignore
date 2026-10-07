@@ -46,9 +46,11 @@ firebase-debug.log*
 firestore-debug.log*
 ui-debug.log*
 .firebase/
+firebase.e2e.json
 
 # test artifacts
 /test-results/
 /playwright-report/
 !.env.staging.example
 !.env.production.example
+!.env.production

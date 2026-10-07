@@ -209,7 +209,7 @@ src/lib/validation/     finance.ts, money.ts
 src/hooks/              use-live-query (generic onSnapshot hook), use-finance-queries, use-month-data
 src/providers/          finance-provider (shared listeners: budgets, emis, goals, recurring incomes)
 src/components/         budgets/, income/, emis/, wishlist/, summary/, plan/ + common sheet helpers
-src/app/(app)/          plan, summary, budgets, income, emis, emis/[id], wishlist, wishlist/[id]
+src/app/(app)/          plan, summary, budgets, income, emis, emis/detail, wishlist, wishlist/detail (?id=)
 ```
 
 ## Monthly summary maths
@@ -454,9 +454,9 @@ Preferences are per device. *Push while the app is closed would need FCM + Cloud
   invariants (Phase 3), restore sessions (above). 72 emulator tests.
 * **App Check** (reCAPTCHA v3) when `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` is set; debug
   tokens for CI. Enforce per product in the console after monitoring.
-* **Headers**: CSP (prod), HSTS (prod), `X-Frame-Options: DENY`, `nosniff`,
+* **Headers** (set by Firebase Hosting in `firebase.json`; the app is a static export): CSP (prod), HSTS (prod), `X-Frame-Options: DENY`, `nosniff`,
   `Referrer-Policy`, `Permissions-Policy`, COOP `same-origin-allow-popups` (Google sign-in),
-  no `X-Powered-By`. E2E runs against the production build to prove CSP compatibility.
+  no `X-Powered-By`. E2E runs against the static build on the Hosting emulator to prove CSP compatibility.
 * **XSS**: React escaping only — no `dangerouslySetInnerHTML`/`eval` anywhere. **CSV
   injection** neutralised on export. Strict Zod validation in every service before writes;
   open-redirect-safe `?next=`; notification URLs restricted to same origin.

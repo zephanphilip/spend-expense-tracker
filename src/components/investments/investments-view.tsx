@@ -18,6 +18,7 @@ import { useFinance } from "@/providers/finance-provider";
 
 import { InvestmentSheet } from "./investment-sheet";
 import { Returns } from "./returns";
+import { routes } from "@/lib/routes";
 
 const KIND_COLORS = ["bg-indigo-500", "bg-sky-500", "bg-amber-500", "bg-yellow-400", "bg-violet-500", "bg-slate-400"];
 
@@ -115,7 +116,7 @@ export function InvestmentsView() {
               const r = investmentReturns(inv);
               return (
                 <li key={inv.id}>
-                  <Link href={`/investments/${inv.id}`} className={cn("flex items-center gap-3 p-4 outline-none hover:bg-muted/40 focus-visible:bg-muted/60", inv.status === "closed" && "opacity-60")}>
+                  <Link href={routes.investment(inv.id)} className={cn("flex items-center gap-3 p-4 outline-none hover:bg-muted/40 focus-visible:bg-muted/60", inv.status === "closed" && "opacity-60")}>
                     <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/12 text-emerald-700 dark:text-emerald-300">
                       <TrendingUp className="size-5" />
                     </span>

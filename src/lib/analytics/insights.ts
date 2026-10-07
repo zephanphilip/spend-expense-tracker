@@ -5,6 +5,7 @@ import type { Account, CurrencyCode } from "@/types";
 
 import type { SpendData } from "./dataset";
 import type { BudgetMonth, Burden, Change, MonthPoint, WeekdayStat } from "./metrics";
+import { routes } from "@/lib/routes";
 
 export type InsightTone = "positive" | "neutral" | "warning";
 
@@ -178,7 +179,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       title: `${card.name} is ${pct(u)} utilised`,
       detail: `Outstanding vs limit. Keeping utilisation under ${pct(THRESHOLDS.cardWarning)} is generally better for your credit score${u >= THRESHOLDS.cardHigh ? "; above " + pct(THRESHOLDS.cardHigh) + " is high" : ""}.`,
       priority: u >= THRESHOLDS.cardHigh ? 87 : 55,
-      href: `/accounts/${card.id}`,
+      href: routes.account(card.id),
     });
   }
 

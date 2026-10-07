@@ -10,12 +10,13 @@ import { Button } from "@/components/ui/button";
 import { emiOverview } from "@/lib/finance/emi";
 import { cn } from "@/lib/utils";
 import type { Emi } from "@/types";
+import { routes } from "@/lib/routes";
 
 export function EmiCard({ emi, onPay }: { emi: Emi; onPay: (emi: Emi) => void }) {
   const o = emiOverview(emi);
   return (
     <li className="rounded-3xl border bg-card p-4">
-      <Link href={`/emis/${emi.id}`} className="flex items-start gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+      <Link href={routes.emi(emi.id)} className="flex items-start gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/12 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300">
           <Landmark className="size-5" />
         </span>

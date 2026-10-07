@@ -2,6 +2,7 @@ import { differenceInCalendarDays, format, startOfDay } from "date-fns";
 
 import type { BudgetProgress } from "./budget";
 import type { UpcomingItem } from "./upcoming";
+import { routes } from "@/lib/routes";
 
 export const REMINDER_KINDS = ["emi", "card", "recurring", "budget"] as const;
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
@@ -65,7 +66,7 @@ export function buildReminders({
         title: `${item.emi.name} EMI ${when(item.date, now)}`,
         body: `${fmt(item.amount)} · installment ${item.emi.paidCount + 1} of ${item.emi.tenureMonths}`,
         urgent: item.overdue,
-        href: `/emis/${item.emi.id}`,
+        href: routes.emi(item.emi.id),
         date: item.date,
       });
     } else if (item.kind === "card" && prefs.enabled.card) {
@@ -75,7 +76,7 @@ export function buildReminders({
         title: `${item.card.name} bill ${when(item.date, now)}`,
         body: `${fmt(item.amount)} statement${item.minimumDue ? ` · minimum ${fmt(item.minimumDue)}` : ""}`,
         urgent: item.overdue,
-        href: `/accounts/${item.card.id}`,
+        href: routes.account(item.card.id),
         date: item.date,
       });
     } else if (item.kind === "recurring" && prefs.enabled.recurring && item.cycle === item.payment.cycle) {

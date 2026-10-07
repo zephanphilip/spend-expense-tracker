@@ -21,6 +21,7 @@ import { AccountIcon } from "./account-icon";
 import { AccountSheet } from "./account-sheet";
 import { CardSummary } from "./card-summary";
 import { TransferSheet } from "./transfer-sheet";
+import { routes } from "@/lib/routes";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -85,7 +86,7 @@ export function AccountsView() {
               <ul className="divide-y overflow-hidden rounded-3xl border bg-card">
                 {assets.map((a) => (
                   <li key={a.id}>
-                    <Link href={`/accounts/${a.id}`} className={cn("flex items-center gap-3 p-4 outline-none hover:bg-muted/40 focus-visible:bg-muted/60", !a.active && "opacity-60")}>
+                    <Link href={routes.account(a.id)} className={cn("flex items-center gap-3 p-4 outline-none hover:bg-muted/40 focus-visible:bg-muted/60", !a.active && "opacity-60")}>
                       <AccountIcon type={a.type} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{a.name}</span>
@@ -109,7 +110,7 @@ export function AccountsView() {
               <ul className="space-y-3">
                 {cards.map((c) => (
                   <li key={c.id} className={cn("rounded-3xl border bg-card p-4", !c.active && "opacity-60")}>
-                    <Link href={`/accounts/${c.id}`} className="flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                    <Link href={routes.account(c.id)} className="flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
                       <AccountIcon type="credit_card" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{c.name}</span>
