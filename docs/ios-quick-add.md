@@ -62,10 +62,14 @@ shown in about 4 taps.
 
 iOS opens the installed app (your normal sign-in, standalone, no Safari UI). Because iOS drops
 the path, the app does the routing:
-* **Cold launch** — lands on the start URL (`/dashboard`) and goes straight to Quick Add.
-* **Resume** — if the app was still in memory, iOS just brings it back; when it has been in
-  the background for ≥ 30 s, it switches to Quick Add — unless a sheet/dialog is open or a
-  field is focused, so nothing in progress is lost.
+* **Launch** — lands on the start URL (`/dashboard`) and goes straight to Quick Add. This
+  includes iOS reloading the start page while the app is still in memory (each page load
+  counts; `sessionStorage` survives such reloads, so it isn't used to detect launches).
+* **Resume** — if iOS just brings the app back (or restores it from the back/forward cache)
+  after ≥ 3 s away, it switches to Quick Add — unless a sheet/dialog is open or a field is
+  focused, so nothing in progress is lost.
+* The setting is stored **per app**: turn it on inside the Home Screen app, not in Safari
+  (they don't share storage).
 
 The amount can't be passed this way (no query string), so you type it in Quick Add.
 

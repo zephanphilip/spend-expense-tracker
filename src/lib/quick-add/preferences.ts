@@ -19,23 +19,25 @@ export const DEFAULT_QUICK_ADD_PREFS: QuickAddPreferences = {
   launchOnOpen: false,
 };
 
-/** Coming back to the app after this long counts as opening it again. */
-export const RESUME_AFTER_MS = 30_000;
+/**
+ * Coming back to the app after this long counts as opening it again (e.g. a Back Tap
+ * shortcut's `webapp://` link bringing it to the front). Shorter switches are ignored.
+ */
+export const RESUME_AFTER_MS = 3_000;
 
-const SESSION_FLAG = "ledger:launched";
+/** Set once this page load has decided where to land (module state: resets on reload). */
+let launchHandled = false;
 
 /**
- * True exactly once per app launch (sessionStorage starts empty in a freshly opened app or
- * tab), so "open into Quick Add" applies to launches, not to every visit to the dashboard.
+ * True exactly once per page load, so "open into Quick Add" applies to launches — including
+ * iOS reloading the app's start page for a `webapp://` link while the app is still in memory
+ * (sessionStorage survives that, so it can't be used here) — but not to later in-app
+ * navigation back to the dashboard (e.g. "Done" in Quick Add).
  */
 export function consumeLaunch(): boolean {
-  try {
-    if (sessionStorage.getItem(SESSION_FLAG)) return false;
-    sessionStorage.setItem(SESSION_FLAG, "1");
-    return true;
-  } catch {
-    return false;
-  }
+  if (launchHandled) return false;
+  launchHandled = true;
+  return true;
 }
 
 /** Installed to the Home Screen and running standalone (iOS sets navigator.standalone). */
