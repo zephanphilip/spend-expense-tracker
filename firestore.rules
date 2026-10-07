@@ -1,0 +1,681 @@
+rules_version = '2';
+
+// Ledger — Firestore Security Rules
+// Every document lives under users/{uid}; only that user can read or write it.
+// Writes are schema-validated so a buggy or malicious client can't store bad data.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Server timestamps written via serverTimestamp() equal request.time.
+    function createdNow() {
+      return incoming().createdAt == request.time && incoming().updatedAt == request.time;
+    }
+
+    function updatedNow() {
+      return incoming().createdAt == resource.data.createdAt
+        && incoming().updatedAt == request.time;
+    }
+
+    function isNullableString(value, maxSize) {
+      return value == null || (value is string && value.size() <= maxSize);
+    }
+
+    // ---------- users/{uid} ----------
+
+    function isValidProfile(data) {
+      return data.keys().hasOnly(['email', 'displayName', 'photoURL', 'currency', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['currency', 'createdAt', 'updatedAt'])
+        && isNullableString(data.get('email', null), 320)
+        && isNullableString(data.get('displayName', null), 50)
+        && isNullableString(data.get('photoURL', null), 2048)
+        && data.currency in ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'CAD', 'AUD'];
+    }
+
+    match /users/{uid} {
+      // ---------- Phase 3 ledger helpers ----------
+      // Every balance-affecting write must move the referenced account(s) by exactly the
+      // record's amount in the same request (services use FieldValue.increment).
+
+      function acct(id) {
+        return /databases/$(database)/documents/users/$(uid)/accounts/$(id);
+      }
+
+      // The account exists before and after, and its balance changed by `delta`.
+      function moved(id, delta) {
+        return exists(acct(id)) && existsAfter(acct(id))
+          && getAfter(acct(id)).data.balance - get(acct(id)).data.balance == delta;
+      }
+
+      // Like moved(), but tolerates accounts that were deleted (old history).
+      function movedOrGone(id, delta) {
+        return !exists(acct(id)) || moved(id, delta);
+      }
+
+      // ---------- Phase 5: backup restore sessions ----------
+      // A restore re-creates documents exactly as backed up (balances already final), so
+      // the cross-document ledger checks are relaxed ONLY for documents stamped with the id
+      // of a restore session the owner opened and that is still in progress.
+      function restorePath(id) {
+        return /databases/$(database)/documents/users/$(uid)/restores/$(id);
+      }
+
+      // Sessions also expire after an hour, so a crashed restore can't leave rules relaxed.
+      function restoring(data) {
+        return data.get('restoreId', null) is string
+          && exists(restorePath(data.restoreId))
+          && get(restorePath(data.restoreId)).data.status == 'restoring'
+          && get(restorePath(data.restoreId)).data.createdAt > request.time - duration.value(1, 'h');
+      }
+
+      function optAccountId(data) {
+        return data.get('accountId', null);
+      }
+
+      function isOptId(value) {
+        return value == null || (value is string && value.size() > 0 && value.size() <= 128);
+      }
+
+      // Ledger effect of creating/deleting/editing a record linked to one account.
+      // `sign` is -1 for money out (expense), +1 for money in (income).
+      function createApplied(data, sign) {
+        return optAccountId(data) == null || moved(optAccountId(data), sign * data.amount);
+      }
+
+      function deleteApplied(data, sign) {
+        return optAccountId(data) == null || movedOrGone(optAccountId(data), -sign * data.amount);
+      }
+
+      function updateApplied(before, after, sign) {
+        let a = optAccountId(before);
+        let b = optAccountId(after);
+        return (a == b && (a == null || movedOrGone(a, sign * (after.amount - before.amount))))
+          || (a != b
+              && (a == null || movedOrGone(a, -sign * before.amount))
+              && (b == null || moved(b, sign * after.amount)));
+      }
+
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidProfile(incoming()) && createdNow();
+      allow update: if isOwner(uid) && isValidProfile(incoming()) && updatedNow();
+      allow delete: if false;
+
+      // ---------- users/{uid}/expenses/{expenseId} ----------
+
+      function isValidExpense(data) {
+        return data.keys().hasOnly(['amount', 'categoryId', 'paymentMethod', 'note', 'occurredAt', 'createdAt', 'updatedAt', 'type', 'accountId', 'importId', 'restoreId', 'recurringId', 'occurrence'])
+          && data.keys().hasAll(['amount', 'categoryId', 'paymentMethod', 'note', 'occurredAt', 'createdAt', 'updatedAt'])
+          // Integer minor units (paise/cents).
+          && data.amount is int && data.amount > 0 && data.amount <= 1000000000000
+          && data.categoryId is string && data.categoryId.size() > 0 && data.categoryId.size() <= 128
+          && data.paymentMethod in ['credit', 'debit', 'upi', 'cash']
+          && data.note is string && data.note.size() <= 280
+          && data.occurredAt is timestamp
+          // Phase 3 (optional so Phase 1 documents stay valid)
+          && data.get('type', 'EXPENSE') == 'EXPENSE'
+          && isOptId(data.get('accountId', null))
+          && isOptId(data.get('importId', null))
+          && isOptId(data.get('restoreId', null))
+          // Occurrence reference for expenses generated from a recurring payment.
+          && isOptId(data.get('recurringId', null))
+          && (data.get('occurrence', null) == null || (data.occurrence is int && data.occurrence >= 0));
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidExpense(incoming()) && createdNow()
+          && (createApplied(incoming(), -1) || restoring(incoming()));
+        allow update: if isOwner(uid) && isValidExpense(incoming()) && updatedNow()
+          && updateApplied(resource.data, incoming(), -1);
+        allow delete: if isOwner(uid) && deleteApplied(resource.data, -1);
+      }
+
+      // ---------- users/{uid}/categories/{categoryId} (custom categories) ----------
+
+      function isValidCategory(data) {
+        return data.keys().hasOnly(['name', 'icon', 'color', 'archived', 'createdAt', 'updatedAt', 'restoreId'])
+          && data.keys().hasAll(['name', 'icon', 'color', 'archived', 'createdAt', 'updatedAt'])
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 32
+          && data.icon in [
+            'utensils', 'coffee', 'basket', 'car', 'train', 'fuel', 'bag', 'shirt', 'receipt',
+            'lightbulb', 'wifi', 'phone', 'house', 'wrench', 'health', 'pill', 'dumbbell',
+            'scissors', 'sparkles', 'film', 'music', 'game', 'plane', 'education', 'book',
+            'gift', 'baby', 'pet', 'bank', 'piggy', 'laptop', 'other'
+          ]
+          && data.color in [
+            'orange', 'amber', 'lime', 'emerald', 'teal', 'sky', 'blue', 'indigo', 'violet',
+            'pink', 'rose', 'slate'
+          ]
+          && data.archived is bool;
+      }
+
+      match /categories/{categoryId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidCategory(incoming()) && createdNow();
+        allow update: if isOwner(uid) && isValidCategory(incoming()) && updatedNow();
+        // Categories are archived, not deleted, so history keeps its labels.
+        allow delete: if false;
+      }
+
+      // ================================================================ Phase 2
+
+      function isMinor(value) {
+        return value is int && value > 0 && value <= 1000000000000;
+      }
+
+      function isMonthKey(value) {
+        return value is string && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])$');
+      }
+
+      function isIncomeSource(value) {
+        return value in ['salary', 'freelance', 'bonus', 'other'];
+      }
+
+      function isName(value, max) {
+        return value is string && value.size() > 0 && value.size() <= max;
+      }
+
+      // ---------- users/{uid}/incomes/{incomeId} ----------
+
+      function isValidIncome(data) {
+        return data.keys().hasOnly(['amount', 'source', 'note', 'receivedAt', 'forMonth', 'expectedAt', 'recurringId', 'createdAt', 'updatedAt', 'type', 'accountId', 'importId', 'restoreId'])
+          && data.keys().hasAll(['amount', 'source', 'note', 'receivedAt', 'forMonth', 'expectedAt', 'recurringId', 'createdAt', 'updatedAt'])
+          && isMinor(data.amount)
+          && isIncomeSource(data.source)
+          && data.note is string && data.note.size() <= 280
+          && data.receivedAt is timestamp
+          && isMonthKey(data.forMonth)
+          && (data.expectedAt == null || data.expectedAt is timestamp)
+          && (data.recurringId == null || isName(data.recurringId, 128))
+          && data.get('type', 'INCOME') == 'INCOME'
+          && isOptId(data.get('accountId', null))
+          && isOptId(data.get('importId', null));
+      }
+
+      match /incomes/{incomeId} {
+        allow read: if isOwner(uid);
+        // Incomes generated from a template must use the deterministic "<templateId>_<month>" id.
+        allow create: if isOwner(uid) && isValidIncome(incoming()) && createdNow()
+          && (incoming().recurringId == null
+              || incomeId == incoming().recurringId + '_' + incoming().forMonth)
+          && (createApplied(incoming(), 1) || restoring(incoming()));
+        allow update: if isOwner(uid) && isValidIncome(incoming()) && updatedNow()
+          && incoming().recurringId == resource.data.recurringId
+          && updateApplied(resource.data, incoming(), 1);
+        allow delete: if isOwner(uid) && deleteApplied(resource.data, 1);
+      }
+
+      // ---------- users/{uid}/recurringIncomes/{templateId} ----------
+
+      function isValidRecurringIncome(data) {
+        return data.keys().hasOnly(['name', 'source', 'amount', 'dayOfMonth', 'startMonth', 'active', 'createdAt', 'updatedAt', 'accountId', 'autoRecord', 'restoreId'])
+          && data.keys().hasAll(['name', 'source', 'amount', 'dayOfMonth', 'startMonth', 'active', 'createdAt', 'updatedAt'])
+          && isName(data.name, 40)
+          && isIncomeSource(data.source)
+          && isMinor(data.amount)
+          && data.dayOfMonth is int && data.dayOfMonth >= 1 && data.dayOfMonth <= 31
+          && isMonthKey(data.startMonth)
+          && data.active is bool
+          && isOptId(data.get('accountId', null))
+          && data.get('autoRecord', false) is bool;
+      }
+
+      match /recurringIncomes/{templateId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidRecurringIncome(incoming()) && createdNow();
+        allow update: if isOwner(uid) && isValidRecurringIncome(incoming()) && updatedNow();
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- users/{uid}/budgets/{month} ----------
+
+      function isValidBudget(data, month) {
+        return data.keys().hasOnly(['month', 'overall', 'categories', 'updatedAt', 'restoreId'])
+          && data.keys().hasAll(['month', 'overall', 'categories', 'updatedAt'])
+          && data.month == month
+          && (data.overall == null || isMinor(data.overall))
+          && data.categories is map && data.categories.size() <= 100
+          && data.updatedAt == request.time;
+      }
+
+      match /budgets/{month} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isMonthKey(month) && isValidBudget(incoming(), month);
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- users/{uid}/emis/{emiId} (+ payments) ----------
+
+      function isValidEmi(data) {
+        return data.keys().hasOnly(['name', 'lender', 'principal', 'annualRateBps', 'monthlyAmount', 'tenureMonths', 'startDate', 'paidCount', 'outstanding', 'status', 'createdAt', 'updatedAt'])
+          && data.keys().hasAll(['name', 'lender', 'principal', 'annualRateBps', 'monthlyAmount', 'tenureMonths', 'startDate', 'paidCount', 'outstanding', 'status', 'createdAt', 'updatedAt'])
+          && isName(data.name, 40)
+          && (data.lender == null || (data.lender is string && data.lender.size() <= 60))
+          && isMinor(data.principal)
+          && data.annualRateBps is int && data.annualRateBps >= 0 && data.annualRateBps <= 10000
+          && isMinor(data.monthlyAmount)
+          && data.tenureMonths is int && data.tenureMonths >= 1 && data.tenureMonths <= 480
+          && data.startDate is timestamp
+          && data.paidCount is int && data.paidCount >= 0 && data.paidCount <= data.tenureMonths
+          && data.outstanding is int && data.outstanding >= 0 && data.outstanding <= data.principal
+          && data.status in ['active', 'closed'];
+      }
+
+      function paymentPath(emiId, installment) {
+        return /databases/$(database)/documents/users/$(uid)/emis/$(emiId)/payments/$(string(installment));
+      }
+
+      match /emis/{emiId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidEmi(incoming()) && createdNow();
+        // paidCount may only move by one, together with creating/deleting that payment record.
+        allow update: if isOwner(uid) && isValidEmi(incoming()) && updatedNow() && (
+          incoming().paidCount == resource.data.paidCount
+          || (incoming().paidCount == resource.data.paidCount + 1
+              && !exists(paymentPath(emiId, incoming().paidCount))
+              && existsAfter(paymentPath(emiId, incoming().paidCount)))
+          || (incoming().paidCount == resource.data.paidCount - 1
+              && exists(paymentPath(emiId, resource.data.paidCount))
+              && !existsAfter(paymentPath(emiId, resource.data.paidCount)))
+        );
+        allow delete: if isOwner(uid);
+
+        function emiPath() {
+          return /databases/$(database)/documents/users/$(uid)/emis/$(emiId);
+        }
+
+        function isValidPayment(data, paymentId) {
+          return data.keys().hasOnly(['installment', 'amount', 'principalPart', 'interestPart', 'dueDate', 'paidAt', 'expenseId', 'createdAt', 'accountId', 'restoreId'])
+            && data.keys().hasAll(['installment', 'amount', 'principalPart', 'interestPart', 'dueDate', 'paidAt', 'expenseId', 'createdAt'])
+            && data.installment is int && data.installment >= 1 && paymentId == string(data.installment)
+            && isMinor(data.amount)
+            && data.principalPart is int && data.principalPart >= 0
+            && data.interestPart is int && data.interestPart >= 0
+            && data.principalPart + data.interestPart == data.amount
+            && data.dueDate is timestamp
+            && data.paidAt is timestamp
+            && (data.expenseId == null || isName(data.expenseId, 128))
+            && isOptId(data.get('accountId', null))
+            && data.createdAt == request.time;
+        }
+
+        function emiTransfer(installment) {
+          return /databases/$(database)/documents/users/$(uid)/transfers/$('emi_' + emiId + '_' + string(installment));
+        }
+
+        match /payments/{paymentId} {
+          allow read: if isOwner(uid);
+          // Must be the next installment, recorded in the same write as the loan update.
+          allow create: if isOwner(uid) && isValidPayment(incoming(), paymentId) && (
+            restoring(incoming())
+            || (get(emiPath()).data.paidCount == incoming().installment - 1
+                && getAfter(emiPath()).data.paidCount == incoming().installment
+                // Paid from an account ⇒ the matching DEBT_PAYMENT is written in the same transaction.
+                && (incoming().get('accountId', null) == null || existsAfter(emiTransfer(incoming().installment))))
+          );
+          allow update: if false;
+          // Only the latest installment can be undone, or anything once the loan is deleted.
+          allow delete: if isOwner(uid) && (
+            !existsAfter(emiPath())
+            || (get(emiPath()).data.paidCount == resource.data.installment
+                && getAfter(emiPath()).data.paidCount == resource.data.installment - 1
+                && (resource.data.get('accountId', null) == null || !existsAfter(emiTransfer(resource.data.installment))))
+          );
+        }
+      }
+
+      // ---------- users/{uid}/goals/{goalId} (+ contributions) ----------
+
+      function isValidGoal(data) {
+        return data.keys().hasOnly(['name', 'icon', 'color', 'targetAmount', 'savedAmount', 'targetDate', 'status', 'lastOpId', 'createdAt', 'updatedAt', 'restoreId'])
+          && data.keys().hasAll(['name', 'icon', 'color', 'targetAmount', 'savedAmount', 'targetDate', 'status', 'lastOpId', 'createdAt', 'updatedAt'])
+          && isName(data.name, 40)
+          && data.icon is string && data.icon.size() <= 32
+          && data.color is string && data.color.size() <= 32
+          && isMinor(data.targetAmount)
+          && data.savedAmount is int && data.savedAmount >= 0 && data.savedAmount <= 1000000000000
+          && (data.targetDate == null || data.targetDate is timestamp)
+          && data.status in ['active', 'archived']
+          && (data.lastOpId == null || isName(data.lastOpId, 128));
+      }
+
+      function contributionPath(goalId, contributionId) {
+        return /databases/$(database)/documents/users/$(uid)/goals/$(goalId)/contributions/$(contributionId);
+      }
+
+      // A change to savedAmount must name (lastOpId) a contribution created or deleted in the same write.
+      function balanceChangeIsBacked(goalId) {
+        let after = incoming();
+        return after.lastOpId != null
+          && exists(contributionPath(goalId, after.lastOpId)) != existsAfter(contributionPath(goalId, after.lastOpId));
+      }
+
+      match /goals/{goalId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidGoal(incoming()) && createdNow()
+          && (incoming().savedAmount == 0 || balanceChangeIsBacked(goalId) || restoring(incoming()));
+        allow update: if isOwner(uid) && isValidGoal(incoming()) && updatedNow()
+          && (incoming().savedAmount == resource.data.savedAmount || balanceChangeIsBacked(goalId));
+        allow delete: if isOwner(uid);
+
+        function goalPath() {
+          return /databases/$(database)/documents/users/$(uid)/goals/$(goalId);
+        }
+
+        function savedBefore() {
+          return exists(goalPath()) ? get(goalPath()).data.savedAmount : 0;
+        }
+
+        match /contributions/{contributionId} {
+          allow read: if isOwner(uid);
+          allow create: if isOwner(uid)
+            && incoming().keys().hasOnly(['amount', 'note', 'contributedAt', 'createdAt', 'restoreId'])
+            && incoming().keys().hasAll(['amount', 'note', 'contributedAt', 'createdAt'])
+            && incoming().amount is int && incoming().amount != 0
+            && incoming().amount <= 1000000000000 && incoming().amount >= -1000000000000
+            && incoming().note is string && incoming().note.size() <= 280
+            && incoming().contributedAt is timestamp
+            && incoming().createdAt == request.time
+            && (getAfter(goalPath()).data.savedAmount == savedBefore() + incoming().amount || restoring(incoming()));
+          allow update: if false;
+          allow delete: if isOwner(uid) && (
+            !existsAfter(goalPath())
+            || getAfter(goalPath()).data.savedAmount == savedBefore() - resource.data.amount
+          );
+        }
+      }
+
+      // ================================================================ Phase 3
+
+      // ---------- users/{uid}/accounts/{accountId} ----------
+
+      function isValidAccount(data) {
+        return data.keys().hasOnly(['name', 'type', 'institution', 'openingBalance', 'balance', 'active', 'creditLimit', 'statementDay', 'dueDay', 'statementBalance', 'minimumDue', 'lastOpId', 'createdAt', 'updatedAt', 'restoreId'])
+          && data.keys().hasAll(['name', 'type', 'institution', 'openingBalance', 'balance', 'active', 'creditLimit', 'statementDay', 'dueDay', 'statementBalance', 'minimumDue', 'lastOpId', 'createdAt', 'updatedAt'])
+          && isName(data.name, 40)
+          && data.type in ['bank', 'cash', 'wallet', 'credit_card']
+          && (data.institution == null || (data.institution is string && data.institution.size() <= 60))
+          && data.openingBalance is int && data.openingBalance >= -1000000000000 && data.openingBalance <= 1000000000000
+          && data.balance is int && data.balance >= -1000000000000 && data.balance <= 1000000000000
+          && data.active is bool
+          && (data.creditLimit == null || isMinor(data.creditLimit))
+          && (data.statementDay == null || (data.statementDay is int && data.statementDay >= 1 && data.statementDay <= 31))
+          && (data.dueDay == null || (data.dueDay is int && data.dueDay >= 1 && data.dueDay <= 31))
+          && (data.statementBalance == null || (data.statementBalance is int && data.statementBalance >= 0))
+          && (data.minimumDue == null || (data.minimumDue is int && data.minimumDue >= 0))
+          && isOptId(data.lastOpId)
+          // Card-only fields stay empty on other account types.
+          && (data.type == 'credit_card'
+              || (data.creditLimit == null && data.statementDay == null && data.dueDay == null
+                  && data.statementBalance == null && data.minimumDue == null));
+      }
+
+      match /accounts/{accountId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidAccount(incoming()) && createdNow()
+          && (incoming().balance == incoming().openingBalance || restoring(incoming()));
+        // The ledger-derived part (balance − opening) only changes together with a ledger
+        // write that stamps its id in lastOpId; the ledger documents verify the exact delta.
+        allow update: if isOwner(uid) && isValidAccount(incoming()) && updatedNow()
+          && incoming().type == resource.data.type
+          && (incoming().balance - incoming().openingBalance == resource.data.balance - resource.data.openingBalance
+              || (incoming().lastOpId != null && incoming().lastOpId != resource.data.lastOpId));
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- users/{uid}/transfers/{transferId} (TRANSFER, DEBT_PAYMENT) ----------
+
+      function isValidTransfer(data, transferId) {
+        return data.keys().hasOnly(['type', 'amount', 'fromAccountId', 'toAccountId', 'emiId', 'emiInstallment', 'note', 'occurredAt', 'createdAt', 'updatedAt', 'restoreId'])
+          && data.keys().hasAll(['type', 'amount', 'fromAccountId', 'toAccountId', 'emiId', 'emiInstallment', 'note', 'occurredAt', 'createdAt', 'updatedAt'])
+          && data.type in ['TRANSFER', 'DEBT_PAYMENT']
+          && isMinor(data.amount)
+          && isName(data.fromAccountId, 128)
+          && isOptId(data.toAccountId)
+          && isOptId(data.emiId)
+          && (data.emiInstallment == null || (data.emiInstallment is int && data.emiInstallment >= 1))
+          && data.note is string && data.note.size() <= 280
+          && data.occurredAt is timestamp
+          && data.fromAccountId != data.toAccountId
+          && (
+            (data.type == 'TRANSFER' && data.toAccountId != null && data.emiId == null
+                && getAfter(acct(data.toAccountId)).data.type != 'credit_card')
+            || (data.type == 'DEBT_PAYMENT' && data.emiId == null && data.toAccountId != null
+                && getAfter(acct(data.toAccountId)).data.type == 'credit_card')
+            || (data.type == 'DEBT_PAYMENT' && data.emiId != null && data.toAccountId == null
+                && data.emiInstallment != null
+                && transferId == 'emi_' + data.emiId + '_' + string(data.emiInstallment))
+          );
+      }
+
+      function emiPaymentDoc(emiId, installment) {
+        return /databases/$(database)/documents/users/$(uid)/emis/$(emiId)/payments/$(string(installment));
+      }
+
+      match /transfers/{transferId} {
+        allow read: if isOwner(uid);
+        // Both sides move by the amount in the same write: source −amount, destination +amount.
+        allow create: if isOwner(uid) && isValidTransfer(incoming(), transferId) && createdNow() && (
+          restoring(incoming())
+          || (moved(incoming().fromAccountId, -incoming().amount)
+              && (incoming().toAccountId == null || moved(incoming().toAccountId, incoming().amount))
+              && (incoming().emiId == null || existsAfter(emiPaymentDoc(incoming().emiId, incoming().emiInstallment))))
+        );
+        // Only descriptive fields can change; amounts and accounts are immutable.
+        allow update: if isOwner(uid) && isValidTransfer(incoming(), transferId) && updatedNow()
+          && incoming().diff(resource.data).affectedKeys().hasOnly(['note', 'occurredAt', 'updatedAt']);
+        // Deleting reverses both sides; EMI payments are only removed together with their installment.
+        allow delete: if isOwner(uid)
+          && movedOrGone(resource.data.fromAccountId, resource.data.amount)
+          && (resource.data.toAccountId == null || movedOrGone(resource.data.toAccountId, -resource.data.amount))
+          && (resource.data.emiId == null || !existsAfter(emiPaymentDoc(resource.data.emiId, resource.data.emiInstallment)));
+      }
+
+      // ---------- users/{uid}/investments/{investmentId} ----------
+
+      function invTx(txId) {
+        return /databases/$(database)/documents/users/$(uid)/investmentTransactions/$(txId);
+      }
+
+      function isValidInvestment(data) {
+        return data.keys().hasOnly(['name', 'kind', 'institution', 'investedAmount', 'currentValue', 'realizedGain', 'purchaseDate', 'lastValuedAt', 'status', 'lastOpId', 'createdAt', 'updatedAt', 'restoreId'])
+          && data.keys().hasAll(['name', 'kind', 'institution', 'investedAmount', 'currentValue', 'realizedGain', 'purchaseDate', 'lastValuedAt', 'status', 'lastOpId', 'createdAt', 'updatedAt'])
+          && isName(data.name, 40)
+          && data.kind in ['mutual_fund', 'stock', 'fd', 'gold', 'crypto', 'other']
+          && (data.institution == null || (data.institution is string && data.institution.size() <= 60))
+          && data.investedAmount is int && data.investedAmount >= 0 && data.investedAmount <= 1000000000000
+          && data.currentValue is int && data.currentValue >= 0 && data.currentValue <= 1000000000000
+          && data.realizedGain is int && data.realizedGain >= -1000000000000 && data.realizedGain <= 1000000000000
+          && data.purchaseDate is timestamp
+          && data.lastValuedAt is timestamp
+          && data.status in ['active', 'closed']
+          && isOptId(data.lastOpId);
+      }
+
+      match /investments/{investmentId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidInvestment(incoming()) && createdNow()
+          && ((incoming().lastOpId != null && existsAfter(invTx(incoming().lastOpId))) || restoring(incoming()));
+        // Amounts only change together with a new history entry named by lastOpId.
+        allow update: if isOwner(uid) && isValidInvestment(incoming()) && updatedNow()
+          && ((incoming().investedAmount == resource.data.investedAmount
+               && incoming().currentValue == resource.data.currentValue
+               && incoming().realizedGain == resource.data.realizedGain)
+              || (incoming().lastOpId != null && incoming().lastOpId != resource.data.lastOpId
+                  && !exists(invTx(incoming().lastOpId)) && existsAfter(invTx(incoming().lastOpId))));
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- users/{uid}/investmentTransactions/{txId} (type INVESTMENT) ----------
+
+      function invPath(investmentId) {
+        return /databases/$(database)/documents/users/$(uid)/investments/$(investmentId);
+      }
+
+      function holdingChangeOk(data) {
+        let p = invPath(data.investmentId);
+        let after = getAfter(p).data;
+        return (data.kind == 'BUY'
+                && after.investedAmount == (exists(p) ? get(p).data.investedAmount : 0) + data.amount
+                && (!exists(p) || after.currentValue == get(p).data.currentValue + data.amount))
+          || (data.kind == 'SELL' && exists(p) && data.costBasis != null
+                && data.amount <= get(p).data.currentValue
+                && after.investedAmount == get(p).data.investedAmount - data.costBasis
+                && after.currentValue == get(p).data.currentValue - data.amount)
+          || (data.kind == 'VALUATION' && exists(p) && after.currentValue == data.amount && data.accountId == null);
+      }
+
+      match /investmentTransactions/{txId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && incoming().keys().hasOnly(['investmentId', 'type', 'kind', 'amount', 'costBasis', 'accountId', 'note', 'occurredAt', 'createdAt', 'restoreId'])
+          && incoming().keys().hasAll(['investmentId', 'type', 'kind', 'amount', 'costBasis', 'accountId', 'note', 'occurredAt', 'createdAt'])
+          && isName(incoming().investmentId, 128)
+          && incoming().type == 'INVESTMENT'
+          && incoming().kind in ['BUY', 'SELL', 'VALUATION']
+          && incoming().amount is int && incoming().amount >= 0 && incoming().amount <= 1000000000000
+          && (incoming().kind == 'VALUATION' || incoming().amount > 0)
+          && (incoming().costBasis == null || (incoming().costBasis is int && incoming().costBasis >= 0))
+          && isOptId(incoming().accountId)
+          && incoming().note is string && incoming().note.size() <= 280
+          && incoming().occurredAt is timestamp
+          && incoming().createdAt == request.time
+          && (restoring(incoming())
+              || (getAfter(invPath(incoming().investmentId)).data.lastOpId == txId
+                  && holdingChangeOk(incoming())
+                  && (incoming().accountId == null
+                      || moved(incoming().accountId, incoming().kind == 'BUY' ? -incoming().amount : incoming().amount))));
+        allow update: if false;
+        // History is only removed together with its investment.
+        allow delete: if isOwner(uid) && !existsAfter(invPath(resource.data.investmentId));
+      }
+
+      // ---------- users/{uid}/recurringPayments/{paymentId} ----------
+
+      function isValidRecurringPayment(data) {
+        return data.keys().hasOnly(['name', 'amount', 'categoryId', 'paymentMethod', 'accountId', 'unit', 'interval', 'startDate', 'cycle', 'nextDate', 'endDate', 'active', 'createdAt', 'updatedAt', 'autoPay', 'restoreId'])
+          && data.keys().hasAll(['name', 'amount', 'categoryId', 'paymentMethod', 'accountId', 'unit', 'interval', 'startDate', 'cycle', 'nextDate', 'endDate', 'active', 'createdAt', 'updatedAt'])
+          && isName(data.name, 40)
+          && isMinor(data.amount)
+          && isName(data.categoryId, 128)
+          && data.paymentMethod in ['credit', 'debit', 'upi', 'cash']
+          && isOptId(data.accountId)
+          && data.unit in ['day', 'week', 'month', 'year']
+          && data.interval is int && data.interval >= 1 && data.interval <= 365
+          && data.startDate is timestamp
+          && data.cycle is int && data.cycle >= 0
+          && data.nextDate is timestamp
+          && (data.endDate == null || data.endDate is timestamp)
+          && data.active is bool
+          && data.get('autoPay', false) is bool;
+      }
+
+      match /recurringPayments/{paymentId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidRecurringPayment(incoming()) && createdNow()
+          && (incoming().cycle == 0 || restoring(incoming()));
+        // The schedule advances one occurrence at a time (pay/skip) or restarts after a reschedule.
+        allow update: if isOwner(uid) && isValidRecurringPayment(incoming()) && updatedNow()
+          && (incoming().cycle == resource.data.cycle || incoming().cycle == resource.data.cycle + 1 || incoming().cycle == 0);
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- users/{uid}/netWorth/{month} (monthly snapshots) ----------
+
+      match /netWorth/{month} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isMonthKey(month)
+          && incoming().keys().hasOnly(['month', 'assets', 'liabilities', 'netWorth', 'updatedAt', 'restoreId'])
+          && incoming().keys().hasAll(['month', 'assets', 'liabilities', 'netWorth', 'updatedAt'])
+          && incoming().month == month
+          && incoming().assets is int && incoming().liabilities is int && incoming().liabilities >= 0
+          && incoming().netWorth == incoming().assets - incoming().liabilities
+          && incoming().updatedAt == request.time;
+        allow delete: if isOwner(uid);
+      }
+
+      // ================================================================ Phase 4
+
+      // ---------- users/{uid}/monthlyStats/{month} (derived analytics aggregates) ----------
+      // A cache maintained with increments alongside expense/income writes and rebuildable
+      // from source data at any time; shape-checked only.
+
+      function isCounter(data, key) {
+        return !(key in data) || (data[key] is map && data[key].size() <= 1000);
+      }
+
+      function isNumberOrAbsent(data, key) {
+        return !(key in data) || data[key] is number;
+      }
+
+      match /monthlyStats/{month} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isMonthKey(month)
+          && incoming().keys().hasOnly(['month', 'version', 'expenseTotal', 'expenseCount', 'incomeTotal', 'incomeCount', 'byCategory', 'byPaymentMethod', 'byAccount', 'byDay', 'incomeBySource', 'updatedAt'])
+          && incoming().month == month
+          && (!('version' in incoming()) || incoming().version == null || incoming().version is int)
+          && isNumberOrAbsent(incoming(), 'expenseTotal') && isNumberOrAbsent(incoming(), 'expenseCount')
+          && isNumberOrAbsent(incoming(), 'incomeTotal') && isNumberOrAbsent(incoming(), 'incomeCount')
+          && isCounter(incoming(), 'byCategory') && isCounter(incoming(), 'byPaymentMethod')
+          && isCounter(incoming(), 'byAccount') && isCounter(incoming(), 'byDay')
+          && isCounter(incoming(), 'incomeBySource')
+          && incoming().updatedAt == request.time;
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- users/{uid}/imports/{importId} (CSV import log, enables undo) ----------
+
+      match /imports/{importId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && incoming().keys().hasOnly(['type', 'fileName', 'total', 'imported', 'skipped', 'duplicates', 'invalid', 'status', 'createdAt', 'updatedAt'])
+          && incoming().keys().hasAll(['type', 'fileName', 'total', 'imported', 'skipped', 'duplicates', 'invalid', 'status', 'createdAt', 'updatedAt'])
+          && incoming().type in ['expenses', 'incomes']
+          && incoming().fileName is string && incoming().fileName.size() <= 200
+          && incoming().total is int && incoming().imported is int && incoming().skipped is int
+          && incoming().duplicates is int && incoming().invalid is int
+          && incoming().status in ['importing', 'completed']
+          && createdNow();
+        // Only the status may change afterwards (importing → completed → undone).
+        allow update: if isOwner(uid)
+          && incoming().diff(resource.data).affectedKeys().hasOnly(['status', 'imported', 'updatedAt'])
+          && incoming().status in ['importing', 'completed', 'undone']
+          && incoming().updatedAt == request.time;
+        allow delete: if false;
+      }
+
+      // ================================================================ Phase 5
+
+      // ---------- users/{uid}/restores/{restoreId} (backup restore sessions) ----------
+      match /restores/{restoreId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && incoming().keys().hasOnly(['status', 'fileName', 'backupCreatedAt', 'counts', 'createdAt', 'updatedAt'])
+          && incoming().status == 'restoring'
+          && incoming().fileName is string && incoming().fileName.size() <= 200
+          && incoming().counts is map
+          && createdNow();
+        // A session can only be closed; it can never be reopened to relax rules again.
+        allow update: if isOwner(uid)
+          && resource.data.status == 'restoring'
+          && incoming().status in ['completed', 'failed']
+          && incoming().diff(resource.data).affectedKeys().hasOnly(['status', 'counts', 'updatedAt'])
+          && incoming().updatedAt == request.time;
+        allow delete: if false;
+      }
+    }
+
+    // Deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
