@@ -4,7 +4,7 @@
  *  - Hashed build assets (/_next/static) and icons: cache-first (they're immutable).
  *  - Everything else (Firebase, APIs) is left alone; Firestore has its own offline cache.
  */
-const VERSION = "v3";
+const VERSION = "v4"; // bump when unhashed assets (icons) change
 const PAGE_CACHE = `ledger-pages-${VERSION}`;
 const ASSET_CACHE = `ledger-assets-${VERSION}`;
 const OFFLINE_URL = "/offline";
