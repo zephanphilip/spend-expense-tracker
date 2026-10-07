@@ -1,4 +1,4 @@
-# Ledger — personal finance tracker
+# Spend — personal finance tracker
 
 Mobile-first expense tracker: Next.js 16 · TypeScript · Tailwind v4 · shadcn/ui · Firebase Auth · Cloud Firestore.
 Architecture, data model, indexes and rules rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

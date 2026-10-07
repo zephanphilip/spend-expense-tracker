@@ -22,6 +22,7 @@ export interface Insight {
 
 export interface InsightInput {
   currency: CurrencyCode;
+  /** In-sentence name of the period, e.g. "this month", "August 2025". */
   periodLabel: string;
   previousLabel: string;
   spending: Change;
@@ -74,7 +75,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       id: "spending-change",
       tone: up ? "warning" : "positive",
       title: `Spending ${up ? "up" : "down"} ${pct(s.ratio)} vs ${input.previousLabel}`,
-      detail: `${m(s.current)} in ${input.periodLabel.toLowerCase()} against ${m(s.previous)} — a change of ${m(Math.abs(s.delta))}. Flagged when the change is at least ${pct(THRESHOLDS.spendingChange)} and ${m(THRESHOLDS.spendingChangeMinMinor)}.`,
+      detail: `${m(s.current)} in ${input.periodLabel} against ${m(s.previous)} — a change of ${m(Math.abs(s.delta))}. Flagged when the change is at least ${pct(THRESHOLDS.spendingChange)} and ${m(THRESHOLDS.spendingChangeMinMinor)}.`,
       priority: up ? 90 : 60,
     });
   }
@@ -190,7 +191,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       id: "largest-category",
       tone: "neutral",
       title: `${input.categoryName(top[0])} is your biggest category`,
-      detail: `${m(top[1])} — ${pct(top[1] / input.current.total)} of everything you spent in ${input.periodLabel.toLowerCase()}.`,
+      detail: `${m(top[1])} — ${pct(top[1] / input.current.total)} of everything you spent in ${input.periodLabel}.`,
       priority: 40,
     });
   }

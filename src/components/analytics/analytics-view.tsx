@@ -7,11 +7,11 @@ import { ErrorState } from "@/components/common/error-state";
 import { PageHeader } from "@/components/common/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type AnalyticsFilters, NO_FILTERS } from "@/lib/analytics/dataset";
-import { type AnalyticsPeriod, resolvePeriod } from "@/lib/analytics/period";
+import { type PeriodSelection, resolveSelection } from "@/lib/analytics/period";
 import { fromDateInputValue, toDateInputValue } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
-import { FilterButton, PeriodPicker } from "./analytics-controls";
+import { FilterButton, PeriodPicker, type PeriodState } from "./analytics-controls";
 import { CashFlowSection, InsightList, OverviewSection, SpendingSection, WealthSection } from "./sections";
 import { RAW_LIMIT } from "./use-analytics";
 import { useAnalyticsModel } from "./use-analytics-model";
@@ -26,20 +26,31 @@ const TABS = [
 type Tab = (typeof TABS)[number]["id"];
 
 export function AnalyticsView() {
-  const [preset, setPreset] = useState<AnalyticsPeriod>("this-month");
-  const [custom, setCustom] = useState(() => {
+  const [periodState, setPeriodState] = useState<PeriodState>(() => {
     const now = new Date();
-    return { from: toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)), to: toDateInputValue(now) };
+    return {
+      kind: "month",
+      offsets: { week: 0, month: 0, year: 0 },
+      range: "30d",
+      custom: { from: toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)), to: toDateInputValue(now) },
+    };
   });
   const [filters, setFilters] = useState<AnalyticsFilters>(NO_FILTERS);
   const [compare, setCompare] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const period = useMemo(
-    () => resolvePeriod(preset, { from: fromDateInputValue(custom.from), to: fromDateInputValue(custom.to) }),
-    [preset, custom.from, custom.to],
-  );
+  const { kind, offsets, range, custom } = periodState;
+  const offset = kind === "week" || kind === "month" || kind === "year" ? offsets[kind] : 0;
+  const period = useMemo(() => {
+    const selection: PeriodSelection =
+      kind === "range"
+        ? { kind, range }
+        : kind === "custom"
+          ? { kind, from: fromDateInputValue(custom.from), to: fromDateInputValue(custom.to) }
+          : { kind, offset };
+    return resolveSelection(selection);
+  }, [kind, offset, range, custom.from, custom.to]);
   const { status, error, retry, model, rebuilding, truncated, usedAggregates, netWorth } = useAnalyticsModel(period, filters);
 
   // Arrow-key navigation between tabs (WAI-ARIA tabs pattern).
@@ -57,7 +68,7 @@ export function AnalyticsView() {
       <PageHeader title="Analytics" description={period.label} back={{ href: "/plan", label: "Plan" }} />
 
       <div className="space-y-3">
-        <PeriodPicker value={preset} onChange={setPreset} custom={custom} onCustomChange={setCustom} />
+        <PeriodPicker value={periodState} onChange={setPeriodState} />
         <div className="flex flex-wrap items-center gap-2">
           <FilterButton value={filters} onChange={setFilters} compare={compare} onCompareChange={setCompare} />
         </div>

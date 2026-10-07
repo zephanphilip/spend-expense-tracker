@@ -156,7 +156,7 @@ describe("metrics", () => {
 describe("insights", () => {
   const base = {
     currency: "INR" as const,
-    periodLabel: "This month",
+    periodLabel: "this month",
     previousLabel: "same point last month",
     current: { total: 0, count: 0, byCategory: {}, byPaymentMethod: {}, byAccount: {}, daily: {} },
     categoryBaseline: { months: 0, perMonth: {} },

@@ -43,8 +43,22 @@ function bucket(days: readonly DayPoint[], keyOf: (d: Date) => string, labelOf: 
   return out;
 }
 
-function trendPoints(cur: DayPoint[], prev: DayPoint[]): { points: TrendPoint[]; granularity: "day" | "week" | "month" } {
-  const granularity = cur.length <= 62 ? "day" : cur.length <= 190 ? "week" : "month";
+export type TrendGranularity = "day" | "week" | "month";
+
+/** Groupings that make sense for a span of `days` days (≤ ~150 bars, ≥ 2 buckets). */
+export function granularitiesFor(days: number): TrendGranularity[] {
+  const out: TrendGranularity[] = [];
+  if (days <= 92) out.push("day");
+  if (days >= 14) out.push("week");
+  if (days >= 45) out.push("month");
+  return out.length ? out : ["day"];
+}
+
+export function autoGranularity(days: number): TrendGranularity {
+  return days <= 62 ? "day" : days <= 190 ? "week" : "month";
+}
+
+export function trendPoints(cur: DayPoint[], prev: DayPoint[], granularity: TrendGranularity = autoGranularity(cur.length)): { points: TrendPoint[]; granularity: TrendGranularity } {
   const group = (days: DayPoint[]) =>
     granularity === "day"
       ? days.map((d) => ({ key: d.key, label: format(d.date, "d"), title: format(d.date, "EEE d MMM"), total: d.total }))
@@ -54,6 +68,31 @@ function trendPoints(cur: DayPoint[], prev: DayPoint[]): { points: TrendPoint[];
   const c = group(cur);
   const p = group(prev);
   return { granularity, points: c.map((x, i) => ({ key: x.key, label: x.label, title: x.title, current: x.total, previous: p[i]?.total })) };
+}
+
+/** Month totals within the period (filters respected), for long periods. */
+export function monthTotals(days: readonly DayPoint[]) {
+  return bucket(days, (d) => format(d, "yyyy-MM"), (d) => format(d, "MMM"), (d) => format(d, "MMMM yyyy"));
+}
+
+/** Headline numbers for the period: averages, extremes and habits. */
+export function periodSummary(days: readonly DayPoint[], total: number, count: number) {
+  const elapsed = Math.max(days.length, 1);
+  let busiest: DayPoint | null = null;
+  let noSpendDays = 0;
+  for (const d of days) {
+    if (d.total === 0) noSpendDays++;
+    else if (!busiest || d.total > busiest.total) busiest = d;
+  }
+  const round = (v: number) => Math.round(v / 100) * 100; // whole currency units
+  return {
+    perWeek: elapsed >= 7 ? round((total / elapsed) * 7) : null,
+    perMonth: elapsed >= 28 ? round((total / elapsed) * (365.25 / 12)) : null,
+    perTransaction: count ? round(total / count) : null,
+    busiest,
+    noSpendDays,
+    spendDays: days.length - noSpendDays,
+  };
 }
 
 export function useAnalyticsModel(period: ResolvedPeriod, filters: AnalyticsFilters) {
@@ -70,7 +109,8 @@ export function useAnalyticsModel(period: ResolvedPeriod, filters: AnalyticsFilt
     const curSpan = { from: period.from, to: period.elapsedTo };
     const days = dailySeries(current, curSpan);
     const prevDays = dailySeries(previous, period.previous);
-    const trend = trendPoints(days, prevDays);
+    const summary = periodSummary(days, current.total, current.count);
+    const months = monthTotals(days);
     const filtered = hasFilters(filters);
 
     const statsMonths = period.months.filter((m) => m <= data.endMonth);
@@ -102,7 +142,7 @@ export function useAnalyticsModel(period: ResolvedPeriod, filters: AnalyticsFilt
 
     const insights = buildInsights({
       currency,
-      periodLabel: period.label,
+      periodLabel: period.phrase,
       previousLabel: period.previous.label,
       spending,
       current,
@@ -126,7 +166,9 @@ export function useAnalyticsModel(period: ResolvedPeriod, filters: AnalyticsFilt
       avgPerDay: Math.round(current.total / period.elapsedDays / 100) * 100,
       prevAvgPerDay: Math.round(previous.total / Math.max(prevDays.length, 1) / 100) * 100,
       days,
-      trend,
+      prevDays,
+      summary,
+      months,
       weekly: weeklySeries(days),
       weekdays,
       heat: heatmap(days),

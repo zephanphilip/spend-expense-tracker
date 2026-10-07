@@ -17,12 +17,14 @@ interface ChartCardProps {
   legend?: { label: string; color: string; dashed?: boolean }[];
   /** Accessible table alternative to the chart. */
   table?: TableData;
+  /** Extra controls in the header (e.g. a grouping toggle). */
+  action?: ReactNode;
   className?: string;
   children: ReactNode;
 }
 
 /** Card wrapper for every chart: title, legend, the chart, and a "View as table" toggle. */
-export function ChartCard({ title, subtitle, legend, table, className, children }: ChartCardProps) {
+export function ChartCard({ title, subtitle, legend, table, action, className, children }: ChartCardProps) {
   const id = useId();
   const [showTable, setShowTable] = useState(false);
   return (
@@ -34,6 +36,8 @@ export function ChartCard({ title, subtitle, legend, table, className, children 
           </h3>
           {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+        {action}
         {table ? (
           <button
             type="button"
@@ -45,6 +49,7 @@ export function ChartCard({ title, subtitle, legend, table, className, children 
             <Table2 className="size-4" aria-hidden />
           </button>
         ) : null}
+        </div>
       </div>
       {legend && legend.length > 1 && !showTable ? (
         <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Legend">

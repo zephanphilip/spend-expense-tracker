@@ -1,4 +1,4 @@
-# Ledger — Phase 1 Architecture
+# Spend — Phase 1 Architecture
 
 Mobile-first personal expense tracker. Next.js (App Router) + Firebase (Auth + Firestore),
 rendered entirely on the client for authenticated screens; Firestore Security Rules are the

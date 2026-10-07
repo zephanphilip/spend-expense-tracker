@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
+import { COLORS, gradientDef, markGlyph, wordmark } from "./brand.mjs";
+
 const outDir = fileURLToPath(new URL("../public/splash/", import.meta.url));
 // [css width, css height, device pixel ratio] — portrait.
 export const DEVICES = [
@@ -25,16 +27,16 @@ function svg(w, h, dark) {
   const x = Math.round((w - s) / 2);
   const y = Math.round((h - s) / 2 - h * 0.04);
   const bg = dark ? "#101116" : "#fdfdfe";
-  const text = dark ? "#f4f4f6" : "#16171c";
+  const textHeight = s * 0.36;
+  const probe = wordmark({ x: 0, y: 0, height: textHeight, color: "" });
+  const word = wordmark({ x: (w - probe.width) / 2, y: y + s + s * 0.28, height: textHeight, color: dark ? COLORS.inkDark : COLORS.ink });
   return Buffer.from(`
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b4ff0"/><stop offset="1" stop-color="#3730a3"/></linearGradient></defs>
+  <defs>${gradientDef()}</defs>
   <rect width="${w}" height="${h}" fill="${bg}"/>
   <rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${s * 0.225}" fill="url(#g)"/>
-  <g transform="translate(${x + s * 0.12} ${y + s * 0.12}) scale(${(s * 0.76) / 24})" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M8 6.5v11h8.5"/><path d="M11.5 10h5"/><path d="M11.5 13.5h3.5"/>
-  </g>
-  <text x="${w / 2}" y="${y + s + s * 0.45}" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="${Math.round(s * 0.24)}" font-weight="600" fill="${text}">Ledger</text>
+  ${markGlyph({ x, y, size: s })}
+  ${word.svg}
 </svg>`);
 }
 

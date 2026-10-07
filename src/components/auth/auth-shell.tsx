@@ -18,7 +18,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
       />
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-6 text-center">
-          <Logo className="justify-center" />
+          <Logo size="lg" className="justify-center" />
           <div className="space-y-1.5">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">{description}</p>

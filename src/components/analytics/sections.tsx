@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { AlertTriangle, ArrowRight, CheckCircle2, Info, Lightbulb } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { AccountIcon } from "@/components/accounts/account-icon";
 import { utilizationTone } from "@/components/accounts/card-summary";
@@ -34,7 +34,7 @@ import type { PaymentMethod } from "@/types";
 import { ChartCard } from "./chart-card";
 import { BarList, ChangeChip, Donut, Heatmap, IncomeExpenseBars, LineSeries, SimpleBars, StackedCategoryBars, TrendChart } from "./charts";
 import { KIND_COLORS, METHOD_COLORS, OTHER_COLOR, SERIES } from "./palette";
-import type { useAnalyticsModel } from "./use-analytics-model";
+import { autoGranularity, granularitiesFor, type TrendGranularity, trendPoints, type useAnalyticsModel } from "./use-analytics-model";
 import { routes } from "@/lib/routes";
 
 type Model = ReturnType<typeof useAnalyticsModel>["model"];
@@ -116,11 +116,73 @@ export function InsightList({ insights, limit }: { insights: Insight[]; limit?: 
   );
 }
 
+const GRANULARITY_LABELS: Record<TrendGranularity, string> = { day: "Day", week: "Week", month: "Month" };
+
+/** Day / Week / Month grouping for the trend chart (only the ones that fit the period). */
+function GranularityToggle({ options, value, onChange }: { options: TrendGranularity[]; value: TrendGranularity; onChange: (g: TrendGranularity) => void }) {
+  if (options.length < 2) return null;
+  return (
+    <div role="group" aria-label="Group by" className="flex rounded-lg bg-muted p-0.5">
+      {options.map((g) => (
+        <button
+          key={g}
+          type="button"
+          aria-pressed={value === g}
+          onClick={() => onChange(g)}
+          className={cn(
+            "h-7 rounded-md px-2.5 text-xs font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+            value === g ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {GRANULARITY_LABELS[g]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PeriodSummary({ m }: { m: Model }) {
+  const s = m.summary;
+  const items: { label: string; value: ReactNode; hint?: ReactNode }[] = [];
+  if (s.perWeek !== null) items.push({ label: "Average per week", value: <Money amount={s.perWeek} /> });
+  if (s.perMonth !== null) items.push({ label: "Average per month", value: <Money amount={s.perMonth} /> });
+  items.push({
+    label: "Average per expense",
+    value: s.perTransaction !== null ? <Money amount={s.perTransaction} /> : "—",
+    hint: `${m.current.count} expense${m.current.count === 1 ? "" : "s"}`,
+  });
+  items.push({
+    label: "Biggest day",
+    value: s.busiest ? <Money amount={s.busiest.total} /> : "—",
+    hint: s.busiest ? format(s.busiest.date, "EEE d MMM yyyy") : "No spending yet",
+  });
+  items.push({ label: "No-spend days", value: s.noSpendDays, hint: `of ${m.days.length} day${m.days.length === 1 ? "" : "s"} so far` });
+  return (
+    <section aria-labelledby="period-summary" className="rounded-3xl border bg-card p-4 md:p-5">
+      <h3 id="period-summary" className="mb-3 font-semibold">Period summary</h3>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
+        {items.map((i) => (
+          <div key={i.label}>
+            <dt className="text-xs text-muted-foreground">{i.label}</dt>
+            <dd className="text-lg font-semibold tabular-nums">{i.value}</dd>
+            {i.hint ? <dd className="text-[11px] text-muted-foreground">{i.hint}</dd> : null}
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 export function OverviewSection({ model: m, period, compare, onSeeInsights }: SectionProps & { onSeeInsights: () => void }) {
   const { currency } = useSession();
   const color = useCategoryColor();
   const { getCategory } = useCategories();
-  const granularityLabel = m.trend.granularity === "day" ? "per day" : m.trend.granularity === "week" ? "per week" : "per month";
+  const options = granularitiesFor(m.days.length);
+  const [chosen, setChosen] = useState<TrendGranularity | null>(null);
+  // A choice that doesn't fit a newly selected period falls back to the automatic one.
+  const granularity = chosen && options.includes(chosen) ? chosen : autoGranularity(m.days.length);
+  const trend = useMemo(() => trendPoints(m.days, m.prevDays, granularity), [m.days, m.prevDays, granularity]);
+  const granularityLabel = granularity === "day" ? "per day" : granularity === "week" ? "per week" : "per month";
   return (
     <div className="space-y-4">
       <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -144,10 +206,13 @@ export function OverviewSection({ model: m, period, compare, onSeeInsights }: Se
         title="Spending trend"
         subtitle={`${period.label} · ${granularityLabel}`}
         legend={compare ? [{ label: "This period", color: "var(--series-expense)" }, { label: `Previous (${period.previous.label})`, color: "var(--series-previous)", dashed: true }] : undefined}
-        table={{ columns: ["Period", "Spent", ...(compare ? ["Previous"] : [])], rows: m.trend.points.map((p) => [p.title, formatMoney(p.current, currency), ...(compare ? [p.previous === undefined ? "—" : formatMoney(p.previous, currency)] : [])]) }}
+        action={<GranularityToggle options={options} value={granularity} onChange={setChosen} />}
+        table={{ columns: ["Period", "Spent", ...(compare ? ["Previous"] : [])], rows: trend.points.map((p) => [p.title, formatMoney(p.current, currency), ...(compare ? [p.previous === undefined ? "—" : formatMoney(p.previous, currency)] : [])]) }}
       >
-        <TrendChart points={m.trend.points} showPrevious={compare} />
+        <TrendChart points={trend.points} showPrevious={compare} />
       </ChartCard>
+
+      <PeriodSummary m={m} />
 
       <section aria-labelledby="top-insights" className="rounded-3xl border bg-card p-4 md:p-5">
         <div className="mb-3 flex items-center justify-between">
@@ -216,6 +281,17 @@ export function SpendingSection({ model: m, period, compare }: SectionProps) {
           table={{ columns: ["Month", ...m.categoryTrend.keys.map(catName), "Other"], rows: m.categoryTrend.rows.map((r) => [String(r.label), ...m.categoryTrend.keys.map((k) => formatMoney(Number(r[k] ?? 0), currency)), formatMoney(Number(r.__other__ ?? 0), currency)]) }}
         >
           <StackedCategoryBars rows={m.categoryTrend.rows} keys={[...m.categoryTrend.keys, ...(m.categoryTrend.hasOther ? ["__other__"] : [])]} colorOf={color} nameOf={catName} />
+        </ChartCard>
+      ) : null}
+
+      {m.months.length >= 2 ? (
+        <ChartCard
+          title="Monthly spending"
+          subtitle={`${m.months.length} months · average ${formatMoney(Math.round(m.current.total / m.months.length / 100) * 100, currency)}`}
+          className="lg:col-span-2"
+          table={{ columns: ["Month", "Spent", "Share"], rows: m.months.map((x) => [x.title, formatMoney(x.total, currency), pct(m.current.total ? x.total / m.current.total : 0)]) }}
+        >
+          <SimpleBars data={m.months.map((x) => ({ key: x.key, label: x.label, title: x.title, value: x.total }))} />
         </ChartCard>
       ) : null}
 

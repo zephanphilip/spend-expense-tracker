@@ -307,7 +307,7 @@ export function validateBackup(text: string): ValidatedBackup {
     .object({ app: z.literal(BACKUP_APP), version: z.number().int(), createdAt: z.string(), profile: z.object({}).passthrough(), collections: z.record(z.string(), z.array(z.unknown())) })
     .safeParse(raw);
   if (!header.success) {
-    return { createdAt: new Date(NaN), profile: { displayName: null, currency: null }, docs: empty, issues: [{ collection: "file", message: "This isn't a Ledger backup file." }] };
+    return { createdAt: new Date(NaN), profile: { displayName: null, currency: null }, docs: empty, issues: [{ collection: "file", message: "This isn't a Spend backup file." }] };
   }
   if (header.data.version > BACKUP_VERSION) {
     issues.push({ collection: "file", message: `Backup version ${header.data.version} is newer than this app supports (${BACKUP_VERSION}). Update the app first.` });
