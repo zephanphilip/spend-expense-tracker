@@ -19,7 +19,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      // Keep the query too, so e.g. a Quick Add deep link survives signing in.
+      router.replace(`/login?next=${encodeURIComponent(pathname + window.location.search)}`);
     }
   }, [status, router, pathname]);
 

@@ -4,15 +4,18 @@
  *  - Hashed build assets (/_next/static) and icons: cache-first (they're immutable).
  *  - Everything else (Firebase, APIs) is left alone; Firestore has its own offline cache.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const PAGE_CACHE = `ledger-pages-${VERSION}`;
 const ASSET_CACHE = `ledger-assets-${VERSION}`;
 const OFFLINE_URL = "/offline";
+const QUICK_ADD_PATH = "/quick-add";
+const QUICK_TIMEOUT_MS = 800;
 // The app's screens are static shells that load data client-side (Firestore's offline cache
 // supplies it), so pre-caching them lets an installed app open fully offline.
 const PRECACHE = [
   OFFLINE_URL,
   "/dashboard",
+  "/quick-add",
   "/expenses",
   "/plan",
   "/settings",
@@ -52,6 +55,27 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Quick Add is launched from Shortcuts / Back Tap where every ~100 ms counts: answer from
+  // the cached shell if the network hasn't replied within QUICK_TIMEOUT_MS (the response
+  // still refreshes the cache). Deep-link query strings share the one cached shell.
+  if (request.mode === "navigate" && url.pathname === QUICK_ADD_PATH) {
+    const network = fetch(request).then((response) => {
+      if (response.ok) {
+        const copy = response.clone();
+        event.waitUntil(caches.open(PAGE_CACHE).then((cache) => cache.put(QUICK_ADD_PATH, copy)));
+      }
+      return response;
+    });
+    event.respondWith(
+      caches.match(QUICK_ADD_PATH).then((cached) => {
+        if (!cached) return network.catch(async () => (await caches.match(OFFLINE_URL)) ?? Response.error());
+        const fallback = new Promise((resolve) => setTimeout(() => resolve(cached), QUICK_TIMEOUT_MS));
+        return Promise.race([network.catch(() => cached), fallback]);
+      }),
+    );
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(

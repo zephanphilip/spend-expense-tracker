@@ -5,6 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 /* While the on-screen keyboard is open (see useKeyboardInset): no home-indicator padding. */
 @custom-variant keyboard (&:where([data-keyboard] *));
+/* Short viewports, e.g. an iPhone in landscape. */
+@custom-variant short (@media (max-height: 500px));
 
 @theme inline {
   --color-background: var(--background);

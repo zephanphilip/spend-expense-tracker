@@ -11,11 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { settleQuickly } from "@/lib/async";
 import { haptic } from "@/lib/haptics";
-import {
-  DEFAULT_PAYMENT_METHOD,
-  isPaymentMethod,
-  type PaymentMethod,
-} from "@/lib/constants/payment-methods";
+import { defaultAccountFor, readLastPaymentMethod, rememberExpenseChoices } from "@/lib/expense-preferences";
 import { toDateTimeLocalValue } from "@/lib/dates";
 import {
   currencySymbol,
@@ -42,68 +38,13 @@ import { useSession } from "@/providers/auth-provider";
 import { AccountPicker } from "@/components/accounts/account-picker";
 import { useCategories } from "@/providers/categories-provider";
 import { useAccounts } from "@/providers/finance-provider";
-import type { Account, AccountType, Expense } from "@/types";
+import type { Account, Expense } from "@/types";
 
 import { AmountInput } from "./amount-input";
 import { CategoryPicker } from "./category-picker";
 import { DateTimeField } from "./date-time-field";
 import { DeleteExpenseDialog } from "./delete-expense-dialog";
 import { PaymentMethodPicker } from "./payment-method-picker";
-
-const LAST_METHOD_KEY = "ledger:last-payment-method";
-const METHOD_ACCOUNT_KEY = "ledger:method-accounts";
-
-/** Account types that fit each payment method, best match first. */
-const METHOD_ACCOUNT_TYPES: Record<PaymentMethod, AccountType[]> = {
-  credit: ["credit_card"],
-  debit: ["bank"],
-  upi: ["bank", "wallet"],
-  cash: ["cash"],
-};
-
-function readMethodAccounts(): Partial<Record<PaymentMethod, string>> {
-  try {
-    return JSON.parse(localStorage.getItem(METHOD_ACCOUNT_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
-
-function rememberMethodAccount(method: PaymentMethod, accountId: string) {
-  try {
-    localStorage.setItem(METHOD_ACCOUNT_KEY, JSON.stringify({ ...readMethodAccounts(), [method]: accountId }));
-  } catch {
-    // Storage unavailable; defaults still work.
-  }
-}
-
-/** Last account used with this method, else the first active account of a fitting type. */
-function defaultAccountFor(method: PaymentMethod, accounts: readonly Account[]): string {
-  const remembered = readMethodAccounts()[method];
-  if (remembered && accounts.some((a) => a.id === remembered && a.active)) return remembered;
-  for (const type of METHOD_ACCOUNT_TYPES[method]) {
-    const match = accounts.find((a) => a.active && a.type === type);
-    if (match) return match.id;
-  }
-  return "";
-}
-
-function readLastPaymentMethod(): PaymentMethod {
-  try {
-    const value = localStorage.getItem(LAST_METHOD_KEY);
-    return isPaymentMethod(value) ? value : DEFAULT_PAYMENT_METHOD;
-  } catch {
-    return DEFAULT_PAYMENT_METHOD;
-  }
-}
-
-function rememberPaymentMethod(method: PaymentMethod) {
-  try {
-    localStorage.setItem(LAST_METHOD_KEY, method);
-  } catch {
-    // Storage unavailable (private mode); the default is fine.
-  }
-}
 
 function initialValues(expense: Expense | null, accounts: readonly Account[]): ExpenseFormValues {
   if (expense) {
@@ -180,8 +121,7 @@ export function ExpenseForm({ expense, onDone }: ExpenseFormProps) {
       }
 
       const { id, committed } = createExpense(user.uid, input, { accountExists: accounts.accountExists });
-      rememberPaymentMethod(input.paymentMethod);
-      if (input.accountId) rememberMethodAccount(input.paymentMethod, input.accountId);
+      rememberExpenseChoices(input);
       const result = await settleQuickly(committed);
       if (result === "pending") {
         committed.catch((error) =>

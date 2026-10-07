@@ -1,6 +1,10 @@
 import {
   doc,
+  getDocsFromCache,
+  getDocsFromServer,
   limit as limitTo,
+  type Query,
+  type QuerySnapshot,
   onSnapshot,
   orderBy,
   query,
@@ -12,7 +16,9 @@ import {
 } from "firebase/firestore";
 
 import { getDb } from "@/lib/firebase/client";
+import { type CategoryBudgetStatus, categoryBudgetStatus, sumCategorySpend } from "@/lib/finance/budget";
 import { expenseEffects, expenseUpdateEffects, reverseEffects } from "@/lib/finance/ledger";
+import { monthKey, monthRange } from "@/lib/months";
 
 import { expenseInputSchema } from "@/lib/validation/expense";
 import type { Expense, ExpenseInput, ExpenseQuery } from "@/types";
@@ -21,8 +27,8 @@ import { mergeStatsDeltas, expenseStatsDelta, expenseUpdateStatsDeltas } from "@
 
 import { type AccountExists, applyBalanceEffects } from "./balances";
 import { applyStatsDeltas } from "./stats.service";
-import { expenseConverter } from "./converters";
-import { expenseDoc, expensesCol } from "./paths";
+import { budgetConverter, expenseConverter } from "./converters";
+import { budgetsCol, expenseDoc, expensesCol } from "./paths";
 
 function toFirestoreFields(input: ExpenseInput) {
   const valid = expenseInputSchema.parse(input);
@@ -156,4 +162,72 @@ export function subscribeAccountExpenses(
     expenseConverter,
   );
   return onSnapshot(q, (snap) => onData(snap.docs.map((d) => d.data())), onError);
+}
+
+/** How long to wait for the server before answering from the on-device cache. */
+const SERVER_READ_TIMEOUT_MS = 4000;
+
+/**
+ * Reads from the server when reachable, else from the local cache (which includes this
+ * device's pending writes). `source` tells the caller which one answered.
+ */
+async function readFresh<T>(q: Query<T>): Promise<{ snap: QuerySnapshot<T>; source: "server" | "cache" }> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return { snap: await getDocsFromCache(q), source: "cache" };
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const snap = await Promise.race([
+      getDocsFromServer(q),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("timeout")), SERVER_READ_TIMEOUT_MS);
+      }),
+    ]);
+    return { snap, source: "server" };
+  } catch {
+    return { snap: await getDocsFromCache(q), source: "cache" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export interface CategoryBudgetResult extends CategoryBudgetStatus {
+  /** "cache" when offline: other devices' changes may be missing. */
+  source: "server" | "cache";
+}
+
+/**
+ * Budget position of a category for the month of `occurredAt` (past and future months
+ * included), computed from the stored expenses and budget documents rather than any
+ * client-side aggregate. Pass the expense that was just written as `include` so it is
+ * counted even if it hasn't reached the server yet.
+ */
+export async function calculateCategoryBudgetStatus(
+  uid: string,
+  { categoryId, occurredAt }: { categoryId: string; occurredAt: Date },
+  include?: { id: string; amount: number; categoryId: string },
+): Promise<CategoryBudgetResult> {
+  const month = monthKey(occurredAt);
+  const { from, to } = monthRange(month);
+  const expensesQuery = query(
+    expensesCol(uid),
+    where("categoryId", "==", categoryId),
+    where("occurredAt", ">=", Timestamp.fromDate(from)),
+    where("occurredAt", "<=", Timestamp.fromDate(to)),
+  ).withConverter(expenseConverter);
+  // Budgets roll forward: the latest document at or before this month applies.
+  const budgetQuery = query(budgetsCol(uid), where("month", "<=", month), orderBy("month", "desc"), limitTo(1)).withConverter(
+    budgetConverter,
+  );
+  const [expenses, budgets] = await Promise.all([readFresh(expensesQuery), readFresh(budgetQuery)]);
+  const spent = sumCategorySpend(
+    expenses.snap.docs.map((d) => d.data()),
+    categoryId,
+    include,
+  );
+  const budget = budgets.snap.docs[0]?.data() ?? null;
+  return {
+    ...categoryBudgetStatus(categoryId, month, budget, spent),
+    source: expenses.source === "server" && budgets.source === "server" ? "server" : "cache",
+  };
 }
