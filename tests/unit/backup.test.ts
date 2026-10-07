@@ -25,7 +25,7 @@ describe("backup encoding", () => {
 describe("backup validation", () => {
   it("rejects non-JSON, foreign files and newer versions", () => {
     expect(validateBackup("{nope").issues[0].message).toBe("Not valid JSON.");
-    expect(validateBackup(JSON.stringify({ hello: 1 })).issues[0].message).toContain("isn't a Ledger backup");
+    expect(validateBackup(JSON.stringify({ hello: 1 })).issues[0].message).toContain("isn't a Spend backup");
     expect(validateBackup(file({}, { version: 99 })).issues[0].message).toContain("newer than this app supports");
   });
 

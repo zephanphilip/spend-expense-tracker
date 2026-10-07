@@ -196,7 +196,7 @@ test("quick add: settings toggles", async ({ page }) => {
 test("quick add: 'open the app into Quick Add' applies to launches of the installed app", async ({ page, context }) => {
   await signUp(page);
   await page.goto("/settings");
-  await page.getByText("Open the app into Quick Add").click();
+  await page.locator("label[for=qa-launch]").click();
   await expect(page.getByRole("switch", { name: /Open the app into Quick Add/ })).toBeChecked();
 
   // A fresh launch of the Home Screen app (iOS sets navigator.standalone).
@@ -239,4 +239,32 @@ test("quick add: budget is computed from stored expenses (edits, deletions, cate
   await quickAdd(page, { amount: "100", category: "Food", method: "UPI" });
   await expect(quickAddMain(page)).toContainText("₹1,900 remaining");
   await expect(quickAddMain(page)).toContainText("5% used · ₹100 of ₹2,000");
+});
+
+test("quick add: returning to the installed app after a while opens Quick Add (webapp:// relaunch)", async ({ page, context }) => {
+  await signUp(page);
+  await page.evaluate(() => localStorage.setItem("ledger:quick-add", JSON.stringify({ launchOnOpen: true })));
+  await context.addInitScript(() => Object.defineProperty(navigator, "standalone", { get: () => true }));
+  const app = await context.newPage();
+  await app.goto("/expenses");
+  await expect(app.getByRole("heading", { name: "History" })).toBeVisible();
+  const away = async (ms: number) =>
+    app.evaluate((ms) => {
+      const set = (state: string) => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+        document.dispatchEvent(new Event("visibilitychange"));
+      };
+      set("hidden");
+      // Pretend the app sat in the background for `ms`.
+      const realNow = Date.now;
+      Date.now = () => realNow() + ms;
+      set("visible");
+      Date.now = realNow;
+    }, ms);
+
+  await away(5_000); // a quick app switch doesn't redirect
+  await expect(app).toHaveURL(/\/expenses$/);
+  await away(60_000);
+  await expect(app).toHaveURL(/\/quick-add$/);
+  await expect(app.getByLabel("Amount", { exact: true })).toBeVisible();
 });

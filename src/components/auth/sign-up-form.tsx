@@ -25,7 +25,7 @@ export function SignUpForm() {
   const onSubmit = handleSubmit(async (values) => {
     try {
       await signUpWithEmail(values);
-      toast.success("Welcome to Ledger!");
+      toast.success("Welcome to Spend!");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }

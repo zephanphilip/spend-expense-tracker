@@ -31,13 +31,13 @@ export function ReminderSettings() {
   async function enableNotifications(on: boolean) {
     if (!on) return setNotify(false);
     if (!supported) {
-      toast.error("Notifications aren't available here", { description: "On iPhone, add Ledger to your Home Screen first (Share → Add to Home Screen)." });
+      toast.error("Notifications aren't available here", { description: "On iPhone, add Spend to your Home Screen first (Share → Add to Home Screen)." });
       return;
     }
     const result = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
     if (result === "granted") {
       setNotify(true);
-      toast.success("Notifications on", { description: "You'll be reminded when you open Ledger." });
+      toast.success("Notifications on", { description: "You'll be reminded when you open Spend." });
     } else toast.error("Notifications are blocked", { description: "Allow them for this site in your browser settings." });
   }
 
@@ -80,14 +80,14 @@ export function ReminderSettings() {
               permission === "denied"
                 ? "Blocked in your browser settings."
                 : !standalone && /iPhone|iPad/.test(typeof navigator === "undefined" ? "" : navigator.userAgent)
-                  ? "On iPhone, add Ledger to your Home Screen to allow notifications."
-                  : "Shown when you open Ledger, once per reminder per day."
+                  ? "On iPhone, add Spend to your Home Screen to allow notifications."
+                  : "Shown when you open Spend, once per reminder per day."
             }
             checked={notify && permission === "granted"}
             onCheckedChange={(v) => void enableNotifications(v)}
           />
           {notify && permission === "granted" ? (
-            <Button variant="ghost" size="sm" className="mt-1" onClick={() => navigator.serviceWorker.ready.then((r) => r.showNotification("Ledger reminders are on", { body: "This is how reminders will look.", icon: "/icons/icon-192.png" }))}>
+            <Button variant="ghost" size="sm" className="mt-1" onClick={() => navigator.serviceWorker.ready.then((r) => r.showNotification("Spend reminders are on", { body: "This is how reminders will look.", icon: "/icons/icon-192.png" }))}>
               <BellRing aria-hidden />
               Send a test
             </Button>

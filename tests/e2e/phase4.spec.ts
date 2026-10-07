@@ -25,7 +25,7 @@ test("analytics: totals, comparison, filters, table view and insights", async ({
   await expect(kpis).toContainText("₹2,000");
 
   // Last month (whole month → served from monthly aggregates, built on first visit).
-  await page.getByRole("button", { name: "Last month", exact: true }).click();
+  await page.getByRole("button", { name: "Previous month" }).click();
   await expect(kpis).toContainText("₹500");
   await expect(page.getByText("Computed from monthly summaries.")).toBeVisible();
 
@@ -109,7 +109,7 @@ test("CSV import: validation, duplicates, preview, summary and undo; export", as
   const download = page.waitForEvent("download");
   await page.getByRole("region", { name: "Export" }).getByRole("button", { name: "Expenses" }).click();
   const file = await download;
-  expect(file.suggestedFilename()).toMatch(/^ledger-expenses-\d{4}-\d{2}-\d{2}\.csv$/);
+  expect(file.suggestedFilename()).toMatch(/^spend-expenses-\d{4}-\d{2}-\d{2}\.csv$/);
   const content = readFileSync((await file.path())!, "utf8");
   expect(content).toContain("Date,Amount,Category,Note,Payment method,Account,Type");
   expect(content).toContain("2026-09-13 12:00,1250.00,Groceries,Groceries run,Debit,,EXPENSE");

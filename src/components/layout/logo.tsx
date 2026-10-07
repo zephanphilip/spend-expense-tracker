@@ -1,19 +1,45 @@
+import brand from "@/lib/brand-mark.json";
 import { cn } from "@/lib/utils";
 
-export function Logo({ className, withWordmark = true }: { className?: string; withWordmark?: boolean }) {
+const { box, d } = brand.mark;
+const GLYPH_H = box.y2 - box.y1;
+const GLYPH_W = box.x2 - box.x1;
+const DOT = GLYPH_H * 0.17;
+const GAP = GLYPH_H * 0.07;
+const PAD = GLYPH_H * 0.5; // glyph is half the tile height, as in the app icon
+const TILE = GLYPH_H + PAD * 2;
+const CONTENT_W = GLYPH_W + GAP + DOT;
+
+/** The app icon in miniature: white "s" + mint full stop on the brand gradient. */
+export function BrandMark({ className }: { className?: string }) {
+  const left = (TILE - CONTENT_W) / 2;
   return (
-    <span className={cn("inline-flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <span
-        aria-hidden
-        className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"
-      >
-        <svg viewBox="0 0 24 24" className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7 5v14h10" />
-          <path d="M11 9h6" />
-          <path d="M11 13h4" />
-        </svg>
-      </span>
-      {withWordmark ? <span className="text-lg">Ledger</span> : <span className="sr-only">Ledger</span>}
+    <svg viewBox={`0 0 ${TILE} ${TILE}`} aria-hidden className={cn("size-8 shrink-0 rounded-[22.5%] shadow-sm", className)}>
+      <defs>
+        <linearGradient id="brand-g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#6d5dfc" />
+          <stop offset="1" stopColor="#3b2fc9" />
+        </linearGradient>
+      </defs>
+      <rect width={TILE} height={TILE} fill="url(#brand-g)" />
+      <path transform={`translate(${left - box.x1} ${PAD - box.y1})`} d={d} fill="#fff" />
+      <circle cx={left + GLYPH_W + GAP + DOT / 2} cy={PAD + GLYPH_H - DOT / 2} r={DOT / 2} fill="#6ee7b7" />
+    </svg>
+  );
+}
+
+/** "spend." wordmark in Bricolage Grotesque, with the mark. */
+export function Logo({ className, withWordmark = true, size = "md" }: { className?: string; withWordmark?: boolean; size?: "md" | "lg" }) {
+  const lg = size === "lg";
+  return (
+    <span className={cn("inline-flex items-center", lg ? "gap-3" : "gap-2", className)}>
+      <BrandMark className={lg ? "size-12" : undefined} />
+      {withWordmark ? (
+        <span aria-hidden className={cn("font-brand leading-none font-extrabold tracking-[-0.03em]", lg ? "text-[2.4rem]" : "text-[1.4rem]")}>
+          spend<span className="text-emerald-400">.</span>
+        </span>
+      ) : null}
+      <span className="sr-only">Spend</span>
     </span>
   );
 }

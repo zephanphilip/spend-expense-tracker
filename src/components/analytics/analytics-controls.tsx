@@ -1,6 +1,6 @@
 "use client";
 
-import { SlidersHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, X } from "lucide-react";
 import { useState } from "react";
 
 import { AccountIcon } from "@/components/accounts/account-icon";
@@ -11,43 +11,124 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type AnalyticsFilters, hasFilters, NO_FILTERS } from "@/lib/analytics/dataset";
-import { ANALYTICS_PERIOD_LABELS, ANALYTICS_PERIODS, type AnalyticsPeriod } from "@/lib/analytics/period";
+import {
+  CALENDAR_UNITS,
+  type CalendarUnit,
+  calendarLabel,
+  PERIOD_KIND_LABELS,
+  PERIOD_KINDS,
+  type PeriodKind,
+  ROLLING_RANGE_LABELS,
+  ROLLING_RANGES,
+  type RollingRange,
+} from "@/lib/analytics/period";
 import { PAYMENT_METHOD_META, PAYMENT_METHODS } from "@/lib/constants/payment-methods";
 import { NO_ACCOUNT } from "@/lib/stats/monthly";
+import { cn } from "@/lib/utils";
 import { Chip } from "@/components/common/chip";
 import { useCategories } from "@/providers/categories-provider";
 import { useAccounts } from "@/providers/finance-provider";
 
 
-interface PeriodPickerProps {
-  value: AnalyticsPeriod;
-  onChange: (value: AnalyticsPeriod) => void;
+export interface PeriodState {
+  kind: PeriodKind;
+  /** Steps back per calendar unit (0 = current). Remembered while switching views. */
+  offsets: Record<CalendarUnit, number>;
+  range: RollingRange;
   custom: { from: string; to: string };
-  onCustomChange: (value: { from: string; to: string }) => void;
 }
 
-export function PeriodPicker({ value, onChange, custom, onCustomChange }: PeriodPickerProps) {
+interface PeriodPickerProps {
+  value: PeriodState;
+  onChange: (value: PeriodState) => void;
+}
+
+const isCalendar = (kind: PeriodKind): kind is CalendarUnit => (CALENDAR_UNITS as readonly string[]).includes(kind);
+
+export function PeriodPicker({ value, onChange }: PeriodPickerProps) {
+  const { kind } = value;
+  const set = (patch: Partial<PeriodState>) => onChange({ ...value, ...patch });
+  const step = (unit: CalendarUnit, delta: number) =>
+    set({ offsets: { ...value.offsets, [unit]: Math.min(value.offsets[unit] + delta, 0) } });
+
   return (
-    <div className="space-y-2">
-      <div role="group" aria-label="Period" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
-        {ANALYTICS_PERIODS.map((p) => (
-          <Chip key={p} selected={value === p} onClick={() => onChange(p)}>
-            {ANALYTICS_PERIOD_LABELS[p]}
-          </Chip>
+    <div className="space-y-3">
+      <div role="group" aria-label="Period type" className="grid grid-cols-5 gap-1 rounded-2xl bg-muted p-1">
+        {PERIOD_KINDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={kind === k}
+            onClick={() => set({ kind: k })}
+            className={cn(
+              "h-9 rounded-xl text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+              kind === k ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {PERIOD_KIND_LABELS[k]}
+          </button>
         ))}
       </div>
-      {value === "custom" ? (
+
+      {isCalendar(kind) ? (
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="icon" className="size-10 rounded-full" onClick={() => step(kind, -1)} aria-label={`Previous ${kind}`}>
+            <ChevronLeft aria-hidden />
+          </Button>
+          <p aria-live="polite" className="min-w-0 flex-1 truncate text-center font-semibold">
+            {calendarLabel(kind, value.offsets[kind])}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="size-10 rounded-full"
+            onClick={() => step(kind, 1)}
+            disabled={value.offsets[kind] >= 0}
+            aria-label={`Next ${kind}`}
+          >
+            <ChevronRight aria-hidden />
+          </Button>
+          {value.offsets[kind] < 0 ? (
+            <Button type="button" variant="ghost" className="h-10 rounded-full px-3" onClick={() => set({ offsets: { ...value.offsets, [kind]: 0 } })}>
+              This {kind}
+            </Button>
+          ) : null}
+        </div>
+      ) : kind === "range" ? (
+        <div role="group" aria-label="Range" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+          {ROLLING_RANGES.map((r) => (
+            <Chip key={r} selected={value.range === r} onClick={() => set({ range: r })}>
+              {ROLLING_RANGE_LABELS[r]}
+            </Chip>
+          ))}
+        </div>
+      ) : (
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label htmlFor="an-from">From</Label>
-            <Input id="an-from" type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => onCustomChange({ ...custom, from: e.target.value })} className="h-11 rounded-xl" />
+            <Input
+              id="an-from"
+              type="date"
+              value={value.custom.from}
+              max={value.custom.to || undefined}
+              onChange={(e) => set({ custom: { ...value.custom, from: e.target.value } })}
+              className="h-11 rounded-xl"
+            />
           </div>
           <div className="space-y-1">
             <Label htmlFor="an-to">To</Label>
-            <Input id="an-to" type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => onCustomChange({ ...custom, to: e.target.value })} className="h-11 rounded-xl" />
+            <Input
+              id="an-to"
+              type="date"
+              value={value.custom.to}
+              min={value.custom.from || undefined}
+              onChange={(e) => set({ custom: { ...value.custom, to: e.target.value } })}
+              className="h-11 rounded-xl"
+            />
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

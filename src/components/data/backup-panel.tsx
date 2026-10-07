@@ -28,7 +28,7 @@ export function BackupPanel() {
     try {
       const backup = await createBackup(user.uid, profile);
       const total = Object.values(backup.collections).reduce((s, l) => s + (l?.length ?? 0), 0);
-      downloadText(`ledger-backup-${format(new Date(), "yyyy-MM-dd")}.json`, JSON.stringify(backup, null, 2), "application/json");
+      downloadText(`spend-backup-${format(new Date(), "yyyy-MM-dd")}.json`, JSON.stringify(backup, null, 2), "application/json");
       toast.success("Backup downloaded", { description: `${total} records. Keep it somewhere safe — it contains your financial history.` });
     } catch (e) {
       toast.error("Backup failed", { description: getErrorMessage(e) });
@@ -78,7 +78,7 @@ export function BackupPanel() {
   return (
     <SectionCard id="backup" title="Backup & restore">
       <p className="-mt-2 mb-3 text-sm text-muted-foreground">
-        A complete JSON copy of everything in Ledger. Restoring adds what&apos;s missing and never overwrites existing records.
+        A complete JSON copy of everything in Spend. Restoring adds what&apos;s missing and never overwrites existing records.
       </p>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" className="h-11 rounded-xl" onClick={download} disabled={backingUp || stage.kind === "restoring"}>

@@ -13,12 +13,12 @@ native code, and nothing native is faked.
 
 ## 1. What iOS allows a web app (and what it doesn't)
 
-| Capability | iOS / iPadOS (Safari, Home Screen web apps) | How Ledger uses it |
+| Capability | iOS / iPadOS (Safari, Home Screen web apps) | How Spend uses it |
 | --- | --- | --- |
 | Install to Home Screen, standalone window | ✅ (Share → Add to Home Screen) | Manifest + `apple-mobile-web-app-*` meta, splash screens, safe-area aware UI |
 | Manifest `shortcuts` (long-press icon menu) | ❌ ignored on iOS (works on Android / desktop Chrome & Edge) | "Quick Add expense" is the first manifest shortcut for those platforms |
 | Apple **Shortcuts** → *Open URLs* | ✅ opens the URL — **in Safari**, not in the Home Screen app | `https://spend-9273d.web.app/quick-add?...` deep links |
-| `webapp://<host>/…` to open the installed web app | ⚠️ undocumented by Apple; reported to open the installed app but **ignore the path** | Pair it with *Settings → Quick Add → Open the app into Quick Add* (see §3) |
+| `webapp://<host>` to open the installed web app | ✅ iOS 16.4+ (undocumented by Apple): opens the **Home Screen app**, not Safari — but **ignores the path and query** | Recommended Back Tap route, paired with *Open the app into Quick Add*, which routes both cold launches and resumes to Quick Add (§3) |
 | **Back Tap** (Settings → Accessibility → Touch) | ✅ can run any Shortcut | Back Tap → Shortcut → Quick Add URL |
 | Web pages detecting Back Tap | ❌ no API | Not attempted |
 | Auto-showing the keyboard on load | ⚠️ iOS only opens the keyboard from a user tap | Amount is focused (desktop/Android get the keyboard); the whole amount area is one big tap target. Fastest iPhone route: let the Shortcut ask for the number natively (§3, recipe B) |
@@ -56,24 +56,30 @@ shown in about 4 taps.
 
 ## 3. Back Tap / Shortcuts recipes
 
-**A. Simple** — Shortcuts app → new shortcut → *Open URLs* →
-`https://spend-9273d.web.app/quick-add`
+**A. In the Home Screen app (recommended)**
+1. In Spend: *Settings → Quick Add → Open the app into Quick Add* — on.
+2. Shortcuts app → new shortcut → *Open URLs* → `webapp://spend-9273d.web.app`
 
-**B. Fastest (native number pad, guaranteed keyboard)**
+iOS opens the installed app (your normal sign-in, standalone, no Safari UI). Because iOS drops
+the path, the app does the routing:
+* **Cold launch** — lands on the start URL (`/dashboard`) and goes straight to Quick Add.
+* **Resume** — if the app was still in memory, iOS just brings it back; when it has been in
+  the background for ≥ 30 s, it switches to Quick Add — unless a sheet/dialog is open or a
+  field is focused, so nothing in progress is lost.
+
+The amount can't be passed this way (no query string), so you type it in Quick Add.
+
+**B. In Safari, amount pre-filled (native number pad)**
 1. *Ask for Input* → Input Type: **Number**, Prompt: "Amount"
 2. *Text*: `https://spend-9273d.web.app/quick-add?amount=` + *Provided Input*
 3. *Open URLs* (the Text)
 
-Quick Add opens directly on the category step with the amount filled in.
+Opens in **Safari** (Safari has its own sign-in) on the category step with the amount filled in.
 
-**C. Fixed expense** (e.g. daily metro) —
+**C. Fixed expense in Safari** (e.g. daily metro) —
 `…/quick-add?amount=40&category=transport&method=upi` opens on Confirm: one tap to save.
 
 Then: Settings → Accessibility → Touch → **Back Tap** → Double Tap → your shortcut.
-
-**Want it in the Home Screen app instead of Safari?** Turn on *Open the app into Quick Add*
-and use *Open URLs* with `webapp://spend-9273d.web.app` (undocumented; path is ignored,
-so the setting does the routing). Parameters can't be passed this way.
 
 ### URL parameters
 

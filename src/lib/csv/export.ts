@@ -105,7 +105,7 @@ export const exporters = {
 } satisfies Record<ExportType, (items: never, l: ExportLookups) => Cell[][]>;
 
 export function exportFileName(type: ExportType, now = new Date()): string {
-  return `ledger-${type}-${format(now, "yyyy-MM-dd")}.csv`;
+  return `spend-${type}-${format(now, "yyyy-MM-dd")}.csv`;
 }
 
 export { toCsv };
