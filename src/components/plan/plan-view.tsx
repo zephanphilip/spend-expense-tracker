@@ -78,7 +78,7 @@ export function PlanView() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Plan" description={`Your money in ${formatMonth(month)}`} />
+      <PageHeader title="More" description={`Your money in ${formatMonth(month)}`} />
 
       <section aria-label="This month" className="grid grid-cols-3 gap-2 rounded-3xl bg-primary p-5 text-primary-foreground">
         {summary ? (
@@ -101,7 +101,7 @@ export function PlanView() {
         )}
       </section>
 
-      <nav aria-label="Plan" className="space-y-5">
+      <nav aria-label="More" className="space-y-5">
         {PLAN_SECTIONS.map((section) => (
           <section key={section} aria-labelledby={`plan-${section}`} className="space-y-2">
             <h2 id={`plan-${section}`} className="px-1 text-sm font-medium text-muted-foreground">

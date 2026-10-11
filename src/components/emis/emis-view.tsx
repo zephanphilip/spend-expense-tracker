@@ -34,7 +34,7 @@ export function EmisView() {
     <div className="space-y-5">
       <PageHeader
         title="EMIs"
-        back={{ href: "/plan", label: "Plan" }}
+        back={{ href: "/plan", label: "More" }}
         action={
           <Button onClick={() => setAdding(true)} className="h-10 rounded-xl">
             <Plus aria-hidden />

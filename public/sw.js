@@ -109,10 +109,13 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// Reminder notifications: open (or focus) the relevant screen when tapped.
+// Reminder notifications: open (or focus) the relevant screen when tapped. Fitness
+// reminders also offer a "Mark completed" action where the platform shows actions; the
+// app performs the write (it needs the signed-in session).
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "/dashboard", self.location.origin);
+  const data = event.notification.data || {};
+  const target = new URL((event.action === "complete" && data.completeUrl) || data.url || "/dashboard", self.location.origin);
   // Only ever navigate within the app.
   const url = target.origin === self.location.origin ? target.href : new URL("/dashboard", self.location.origin).href;
   event.waitUntil(

@@ -50,3 +50,9 @@ export const monthlyStatsCol = (uid: string) => subCol(uid, "monthlyStats");
 export const monthlyStatsDoc = (uid: string, month: string) => sub(uid, "monthlyStats", month);
 export const importsCol = (uid: string) => subCol(uid, "imports");
 export const importDoc = (uid: string, id: string) => sub(uid, "imports", id);
+
+// Fitness (independent of the money collections)
+export const fitnessActivitiesCol = (uid: string) => subCol(uid, "fitnessActivities");
+export const fitnessActivityDoc = (uid: string, id: string) => sub(uid, "fitnessActivities", id);
+export const fitnessLogsCol = (uid: string) => subCol(uid, "fitnessLogs");
+export const fitnessLogDoc = (uid: string, id: string) => sub(uid, "fitnessLogs", id);

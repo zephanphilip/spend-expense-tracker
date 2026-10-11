@@ -62,7 +62,7 @@ export function NetWorthView() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Net worth" back={{ href: "/plan", label: "Plan" }} />
+      <PageHeader title="Net worth" back={{ href: "/plan", label: "More" }} />
       {!hasData ? (
         <EmptyState
           icon={Scale}

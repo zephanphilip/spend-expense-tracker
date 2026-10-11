@@ -29,7 +29,7 @@ export function UpcomingView() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Upcoming" description="Next 30 days" back={{ href: "/plan", label: "Plan" }} />
+      <PageHeader title="Upcoming" description="Next 30 days" back={{ href: "/plan", label: "More" }} />
       {status === "loading" ? (
         <Skeleton className="h-60 rounded-3xl" aria-label="Loading upcoming payments" />
       ) : status === "error" ? (

@@ -37,7 +37,7 @@ export function SummaryView() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Monthly summary" back={{ href: "/plan", label: "Plan" }} />
+      <PageHeader title="Monthly summary" back={{ href: "/plan", label: "More" }} />
       <MonthSwitcher value={month} onChange={setMonth} max={currentMonth} />
 
       {data.status === "loading" ? (

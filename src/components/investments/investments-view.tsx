@@ -39,7 +39,7 @@ export function InvestmentsView() {
     <div className="space-y-5">
       <PageHeader
         title="Investments"
-        back={{ href: "/plan", label: "Plan" }}
+        back={{ href: "/plan", label: "More" }}
         action={
           <Button onClick={() => setAdding(true)} className="h-10 rounded-xl">
             <Plus aria-hidden />

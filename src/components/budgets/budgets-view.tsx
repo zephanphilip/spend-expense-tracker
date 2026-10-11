@@ -51,7 +51,7 @@ export function BudgetsView() {
     <div className="space-y-5">
       <PageHeader
         title="Budgets"
-        back={{ href: "/plan", label: "Plan" }}
+        back={{ href: "/plan", label: "More" }}
         action={
           <Button onClick={() => setEditing(true)} className="h-10 rounded-xl" disabled={loading}>
             <Pencil aria-hidden />

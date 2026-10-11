@@ -12,6 +12,8 @@ import { DEFAULT_CURRENCY, isCurrencyCode } from "@/lib/constants/currencies";
 import { DEFAULT_PAYMENT_METHOD, isPaymentMethod } from "@/lib/constants/payment-methods";
 import { isAccountType, isInvestmentKind } from "@/lib/constants/accounts";
 import { isIncomeSource } from "@/lib/constants/income";
+import { FITNESS_STATUSES, isFitnessIcon, SCHEDULE_KINDS } from "@/lib/constants/fitness";
+import { isDateKey } from "@/lib/fitness/dates";
 import { isMonthKey, monthKey } from "@/lib/months";
 import type {
   Account,
@@ -31,6 +33,7 @@ import type {
   Transfer,
   UserProfile,
 } from "@/types";
+import type { FitnessActivity, FitnessLog, ScheduleRule } from "@/types/fitness";
 
 /** Pending server timestamps are estimated locally so freshly written docs sort correctly. */
 const SNAPSHOT_OPTIONS: SnapshotOptions = { serverTimestamps: "estimate" };
@@ -268,5 +271,61 @@ export const netWorthConverter = readOnly<NetWorthSnapshot>((data, id) => ({
   assets: int(data.assets),
   liabilities: int(data.liabilities),
   netWorth: int(data.netWorth),
+  updatedAt: toDate(data.updatedAt),
+}));
+
+// ---------------------------------------------------------------- Fitness
+
+const SCHEDULE_KIND_SET = new Set<string>(SCHEDULE_KINDS);
+const FITNESS_STATUS_SET = new Set<string>(FITNESS_STATUSES);
+const numberOrNull = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+
+function readSchedules(value: unknown, startDate: string): ScheduleRule[] {
+  const rules = (Array.isArray(value) ? value : [])
+    .filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object")
+    .filter((r) => isDateKey(r.from) && SCHEDULE_KIND_SET.has(String(r.kind)))
+    .map((r) => ({
+      from: r.from as string,
+      kind: r.kind as ScheduleRule["kind"],
+      days: Array.isArray(r.days) ? r.days.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6) : [],
+      perWeek: numberOrNull(r.perWeek),
+      every: numberOrNull(r.every),
+    }))
+    .sort((a, b) => a.from.localeCompare(b.from));
+  return rules.length ? rules : [{ from: startDate, kind: "daily", days: [], perWeek: null, every: null }];
+}
+
+export const fitnessActivityConverter = readOnly<FitnessActivity>((data, id) => {
+  const startDate = isDateKey(data.startDate) ? data.startDate : "1970-01-01";
+  return {
+    id,
+    name: typeof data.name === "string" ? data.name : "Untitled",
+    description: typeof data.description === "string" ? data.description : "",
+    icon: isFitnessIcon(data.icon) ? data.icon : "activity",
+    color: data.color in CATEGORY_COLORS ? data.color : "slate",
+    startDate,
+    endDate: isDateKey(data.endDate) ? data.endDate : null,
+    schedules: readSchedules(data.schedules, startDate),
+    reminderEnabled: data.reminderEnabled === true,
+    reminderTime: typeof data.reminderTime === "string" ? data.reminderTime : null,
+    targetDuration: numberOrNull(data.targetDuration),
+    targetQuantity: numberOrNull(data.targetQuantity),
+    unit: typeof data.unit === "string" && data.unit ? data.unit : null,
+    multipleEntries: data.multipleEntries === true,
+    status: FITNESS_STATUS_SET.has(data.status) ? data.status : "active",
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  };
+});
+
+export const fitnessLogConverter = readOnly<FitnessLog>((data, id) => ({
+  id,
+  activityId: typeof data.activityId === "string" ? data.activityId : "",
+  date: isDateKey(data.date) ? data.date : "1970-01-01",
+  completedAt: toDate(data.completedAt),
+  durationMin: numberOrNull(data.durationMin),
+  quantity: numberOrNull(data.quantity),
+  note: typeof data.note === "string" ? data.note : "",
+  createdAt: toDate(data.createdAt),
   updatedAt: toDate(data.updatedAt),
 }));

@@ -475,3 +475,53 @@ Preferences are per device. *Push while the app is closed would need FCM + Cloud
 ## Errors & monitoring
 Route error boundary with retry, global error page, not-found page; Firebase Performance
 Monitoring (opt-in via env) for page-load and network traces.
+
+## Fitness (lite habit tracker)
+
+A separate domain under the same user: it never reads or writes money collections.
+Routes: `/fitness` (today + week strip), `/fitness/analytics`, `/fitness/activity?id=`.
+The bottom bar is Home · History · (+) · Fitness · More (the Plan hub, now also holding
+Settings).
+
+```
+users/{uid}/fitnessActivities/{id}  name, description, icon, color, startDate, endDate,
+                                    schedules[], reminderEnabled, reminderTime "HH:MM",
+                                    targetDuration (min), targetQuantity, unit,
+                                    multipleEntries, status active|paused|archived,
+                                    createdAt, updatedAt
+users/{uid}/fitnessLogs/{id}        activityId, date "YYYY-MM-DD", completedAt (timestamp),
+                                    durationMin, quantity, note, createdAt, updatedAt
+```
+
+* **Dates** are local calendar-day keys taken from the device clock when a record is made;
+  schedule/streak maths runs on the keys (UTC arithmetic), so time zones and DST can't
+  shift a day. `completedAt` (when it was done) is separate from `createdAt` (when it was
+  recorded).
+* **Schedules are versioned**: `schedules` is a list of `{from, kind, days, perWeek, every}`.
+  Changing the frequency appends a version effective today; pausing/archiving appends a
+  `none` version. Past days are always judged by the schedule that applied then, and logs
+  are never rewritten.
+* **Idempotent check-ins**: a one-per-day activity's log id is `<activityId>_<date>` (Rules
+  enforce the pairing), so double taps and retries can't create duplicates. Multi-session
+  activities use random ids. Moving a check-in to another day is a delete + create batch.
+  Logging a day before the start date moves the start back in the same batch.
+* **Reads**: activities plus a rolling 400-day log window are live app-wide (no log listener
+  until the first activity exists). Older analytics ranges and the month calendar open
+  date-range queries; activity history is paginated (`activityId ASC, date DESC` index).
+* **Calculations** (`lib/fitness/stats.ts`, unit-tested): a day is done when ≥ 1 log exists.
+  Completion rate = completed scheduled occurrences ÷ scheduled occurrences, excluding
+  days before start/after end/while paused and unscheduled days. Today (and the current
+  week of an "N times a week" activity) is pending — it never lowers a rate or breaks a
+  streak, and counts once done. Streaks run over scheduled occurrences (weeks for "N times
+  a week"); the overall streak is days in a row with any activity. Nothing derived is
+  stored, so historical edits are reflected everywhere.
+* **Reminders** are in-app only (no push server/Cloud Functions): a banner on the Fitness tab
+  when a reminder time has passed and the activity is due and not done, plus an optional
+  device notification (permission asked only when the user turns it on) shown while the app
+  is open or the next time it's opened — once per activity per day. "Mark completed" is
+  offered as a notification action where the platform supports actions (not iOS). Reliable
+  delivery while the app is closed would need Web Push from a scheduled Cloud Function
+  (Blaze plan + VAPID keys) — not implemented.
+* **Offline**: writes go to Firestore's persistent cache and sync later; records waiting to
+  sync show a cloud icon (snapshot `hasPendingWrites`). Fitness data isn't included in JSON
+  backups yet.

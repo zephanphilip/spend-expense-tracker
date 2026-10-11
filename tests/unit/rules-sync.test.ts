@@ -8,6 +8,7 @@ import { CURRENCY_CODES } from "@/lib/constants/currencies";
 import { CATEGORY_ICON_KEYS } from "@/lib/constants/icons";
 import { PAYMENT_METHODS } from "@/lib/constants/payment-methods";
 import { DEFAULT_CATEGORIES } from "@/lib/constants/categories";
+import { FITNESS_ICON_KEYS, FITNESS_STATUSES, SCHEDULE_KINDS } from "@/lib/constants/fitness";
 
 const rules = readFileSync(join(process.cwd(), "firestore.rules"), "utf8");
 
@@ -30,6 +31,12 @@ describe("firestore.rules stays in sync with app constants", () => {
   });
   it("currencies", () => {
     expect(listAfter("data.currency").sort()).toEqual([...CURRENCY_CODES].sort());
+  });
+  it("fitness icons, colours, schedules and statuses", () => {
+    expect(listAfter("fitnessIcon").sort()).toEqual([...FITNESS_ICON_KEYS].sort());
+    expect(listAfter("fitnessColor").sort()).toEqual([...CATEGORY_COLOR_KEYS].sort());
+    expect(listAfter("rule.kind").sort()).toEqual([...SCHEDULE_KINDS].sort());
+    expect(rules).toContain(`data.status in [${FITNESS_STATUSES.map((s) => `'${s}'`).join(", ")}]`);
   });
   it("default categories use valid icons/colors and unique ids", () => {
     const ids = DEFAULT_CATEGORIES.map((c) => c.id);

@@ -4,8 +4,8 @@ import { format } from "date-fns";
 import { addExpense, signUp } from "./helpers";
 
 async function goPlan(page: Page, section: RegExp) {
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Plan" }).click();
-  await page.getByRole("navigation", { name: "Plan" }).getByRole("link", { name: section }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "More" }).click();
+  await page.getByRole("navigation", { name: "More" }).getByRole("link", { name: section }).click();
 }
 
 test("budgets: set overall + category limits, see progress and over-budget state", async ({ page }) => {

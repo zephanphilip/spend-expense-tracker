@@ -128,8 +128,8 @@ test("create a custom category from the add sheet and use it", async ({ page }) 
   await expect(page.getByText("₹120 · Coffee added")).toBeVisible();
 
   // Archive it from the Categories screen; history still shows the name.
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Plan" }).click();
-  await page.getByRole("navigation", { name: "Plan" }).getByRole("link", { name: /Categories/ }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "More" }).click();
+  await page.getByRole("navigation", { name: "More" }).getByRole("link", { name: /Categories/ }).click();
   await page.getByRole("button", { name: "Archive Coffee" }).click();
   await expect(page.getByRole("region", { name: "Archived" })).toContainText("Coffee");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "History" }).click();
@@ -140,7 +140,8 @@ test("profile, currency and sign out / sign in", async ({ page }) => {
   const { email } = await signUp(page, { name: "Ravi Kumar" });
   await addExpense(page, { amount: "50", category: "Food" });
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "More" }).click();
+  await page.getByRole("navigation", { name: "More" }).getByRole("link", { name: /^Settings/ }).click();
   await page.getByLabel("Currency").selectOption("USD");
   await page.getByRole("button", { name: "Save profile" }).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
@@ -148,7 +149,8 @@ test("profile, currency and sign out / sign in", async ({ page }) => {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Home" }).click();
   await expect(page.getByRole("region", { name: /Spent in/ })).toContainText("$50");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "More" }).click();
+  await page.getByRole("navigation", { name: "More" }).getByRole("link", { name: /^Settings/ }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
 

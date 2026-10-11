@@ -65,7 +65,7 @@ export function AnalyticsView() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Analytics" description={period.label} back={{ href: "/plan", label: "Plan" }} />
+      <PageHeader title="Analytics" description={period.label} back={{ href: "/plan", label: "More" }} />
 
       <div className="space-y-3">
         <PeriodPicker value={periodState} onChange={setPeriodState} />

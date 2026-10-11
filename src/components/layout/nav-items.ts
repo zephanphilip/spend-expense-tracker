@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   CalendarClock,
   ChartPie,
@@ -35,7 +36,7 @@ export interface PlanItem extends NavItem {
 export const PLAN_SECTIONS = ["This month", "Money", "Plans", "Setup"] as const;
 export type PlanSection = (typeof PLAN_SECTIONS)[number];
 
-/** Everything reachable from the Plan tab (also listed in the desktop sidebar). */
+/** Everything reachable from the More tab (also listed in the desktop sidebar). */
 export const PLAN_ITEMS: PlanItem[] = [
   { href: "/analytics", label: "Analytics & insights", icon: BarChart3, description: "Trends, breakdowns, patterns", section: "This month" },
   { href: "/summary", label: "Monthly summary", icon: ChartPie, description: "Income, spending, savings rate", section: "This month" },
@@ -50,13 +51,14 @@ export const PLAN_ITEMS: PlanItem[] = [
   { href: "/wishlist", label: "Wishlist", icon: Heart, description: "Save towards things you want", section: "Plans" },
   { href: "/categories", label: "Categories", icon: Shapes, description: "Built-in and your own", section: "Setup" },
   { href: "/data", label: "Import & export", icon: FileSpreadsheet, description: "CSV import with preview, exports", section: "Setup" },
+  { href: "/settings", label: "Settings", icon: Settings, description: "Profile, reminders, appearance", section: "Setup" },
 ];
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: House },
   { href: "/expenses", label: "History", icon: ReceiptText },
-  { href: "/plan", label: "Plan", icon: LayoutGrid, matches: PLAN_ITEMS.map((i) => i.href) },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/fitness", label: "Fitness", icon: Activity },
+  { href: "/plan", label: "More", icon: LayoutGrid, matches: PLAN_ITEMS.map((i) => i.href) },
 ];
 
 function matchesPath(pathname: string, href: string): boolean {

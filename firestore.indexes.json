@@ -143,6 +143,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "fitnessLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "activityId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -169,6 +183,21 @@
     {
       "collectionGroup": "investmentTransactions",
       "fieldPath": "note",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "fitnessLogs",
+      "fieldPath": "note",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "fitnessActivities",
+      "fieldPath": "schedules",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "fitnessActivities",
+      "fieldPath": "description",
       "indexes": []
     }
   ]

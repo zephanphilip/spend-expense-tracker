@@ -671,6 +671,95 @@ service cloud.firestore {
           && incoming().updatedAt == request.time;
         allow delete: if false;
       }
+
+      // ================================================================ Fitness
+      // Independent of the money ledger: no cross-document balance checks, just ownership
+      // and schema validation.
+
+      function isDateKey(value) {
+        return value is string && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+      }
+
+      function isFitnessIcon(fitnessIcon) {
+        return fitnessIcon in ['activity', 'run', 'walk', 'bike', 'gym', 'swim', 'hike', 'stretch', 'yoga', 'heart', 'flame', 'timer', 'water', 'meditate', 'read', 'sleep', 'moon', 'sun', 'food', 'vitamins', 'music', 'target', 'trophy'];
+      }
+
+      function isFitnessColor(fitnessColor) {
+        return fitnessColor in ['orange', 'amber', 'lime', 'emerald', 'teal', 'sky', 'blue', 'indigo', 'violet', 'pink', 'rose', 'slate'];
+      }
+
+      // Rules can't loop over lists, so the first and latest schedule versions are checked
+      // (the client only ever appends to the end).
+      function isScheduleRule(rule) {
+        return rule is map
+          && rule.keys().hasOnly(['from', 'kind', 'days', 'perWeek', 'every'])
+          && rule.keys().hasAll(['from', 'kind', 'days', 'perWeek', 'every'])
+          && isDateKey(rule.from)
+          && rule.kind in ['daily', 'weekdays', 'perWeek', 'interval', 'none']
+          && rule.days is list && rule.days.size() <= 7
+          && (rule.perWeek == null || (rule.perWeek is int && rule.perWeek >= 1 && rule.perWeek <= 7))
+          && (rule.every == null || (rule.every is int && rule.every >= 1 && rule.every <= 365));
+      }
+
+      // ---------- users/{uid}/fitnessActivities/{activityId} ----------
+
+      function isValidFitnessActivity(data) {
+        return data.keys().hasOnly(['name', 'description', 'icon', 'color', 'startDate', 'endDate', 'schedules', 'reminderEnabled', 'reminderTime', 'targetDuration', 'targetQuantity', 'unit', 'multipleEntries', 'status', 'createdAt', 'updatedAt'])
+          && data.keys().hasAll(['name', 'description', 'icon', 'color', 'startDate', 'endDate', 'schedules', 'reminderEnabled', 'reminderTime', 'targetDuration', 'targetQuantity', 'unit', 'multipleEntries', 'status', 'createdAt', 'updatedAt'])
+          && isName(data.name, 40)
+          && data.description is string && data.description.size() <= 140
+          && isFitnessIcon(data.icon)
+          && isFitnessColor(data.color)
+          && isDateKey(data.startDate)
+          && (data.endDate == null || (isDateKey(data.endDate) && data.endDate >= data.startDate))
+          && data.schedules is list && data.schedules.size() >= 1 && data.schedules.size() <= 100
+          && isScheduleRule(data.schedules[0]) && data.schedules[0].from == data.startDate
+          && isScheduleRule(data.schedules[data.schedules.size() - 1])
+          && data.reminderEnabled is bool
+          && (data.reminderTime == null || (data.reminderTime is string && data.reminderTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')))
+          && (data.targetDuration == null || (data.targetDuration is int && data.targetDuration >= 1 && data.targetDuration <= 1440))
+          && (data.targetQuantity == null || (data.targetQuantity is number && data.targetQuantity > 0 && data.targetQuantity <= 1000000))
+          && isNullableString(data.unit, 16)
+          && data.multipleEntries is bool
+          && data.status in ['active', 'paused', 'archived'];
+      }
+
+      match /fitnessActivities/{activityId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidFitnessActivity(incoming()) && createdNow();
+        allow update: if isOwner(uid) && isValidFitnessActivity(incoming()) && updatedNow();
+        allow delete: if isOwner(uid);
+      }
+
+      // ---------- users/{uid}/fitnessLogs/{logId} ----------
+      // A daily check-in's id is "<activityId>_<date>", so a repeated tap or a retried write
+      // can't create a second record for the same day; such an id must match its fields.
+      // Multi-session activities use random ids (which never end in a date).
+
+      function isValidFitnessLog(data, logId) {
+        return data.keys().hasOnly(['activityId', 'date', 'completedAt', 'durationMin', 'quantity', 'note', 'createdAt', 'updatedAt'])
+          && data.keys().hasAll(['activityId', 'date', 'completedAt', 'durationMin', 'quantity', 'note', 'createdAt', 'updatedAt'])
+          && isName(data.activityId, 128)
+          && isDateKey(data.date)
+          && data.completedAt is timestamp
+          && (data.durationMin == null || (data.durationMin is int && data.durationMin >= 0 && data.durationMin <= 1440))
+          && (data.quantity == null || (data.quantity is number && data.quantity >= 0 && data.quantity <= 1000000))
+          && data.note is string && data.note.size() <= 280
+          && (!logId.matches('.*_[0-9]{4}-[0-9]{2}-[0-9]{2}$') || logId == data.activityId + '_' + data.date);
+      }
+
+      function fitnessActivityPath(activityId) {
+        return /databases/$(database)/documents/users/$(uid)/fitnessActivities/$(activityId);
+      }
+
+      match /fitnessLogs/{logId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidFitnessLog(incoming(), logId) && createdNow()
+          && exists(fitnessActivityPath(incoming().activityId));
+        allow update: if isOwner(uid) && isValidFitnessLog(incoming(), logId) && updatedNow()
+          && incoming().activityId == resource.data.activityId;
+        allow delete: if isOwner(uid);
+      }
     }
 
     // Deny everything else.

@@ -55,7 +55,7 @@ export function CategoriesView() {
       <PageHeader
         title="Categories"
         description="Built-in categories plus your own."
-        back={{ href: "/plan", label: "Plan" }}
+        back={{ href: "/plan", label: "More" }}
         action={
           <Button onClick={() => setDialog({ open: true })} className="h-10 rounded-xl">
             <Plus aria-hidden />

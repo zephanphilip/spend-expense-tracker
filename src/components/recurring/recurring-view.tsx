@@ -38,7 +38,7 @@ export function RecurringView() {
     <div className="space-y-5">
       <PageHeader
         title="Recurring payments"
-        back={{ href: "/plan", label: "Plan" }}
+        back={{ href: "/plan", label: "More" }}
         action={
           <Button onClick={() => setEditing({ open: true, payment: null })} className="h-10 rounded-xl">
             <Plus aria-hidden />

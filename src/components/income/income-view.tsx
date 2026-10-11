@@ -48,7 +48,7 @@ export function IncomeView() {
     <div className="space-y-5">
       <PageHeader
         title="Income"
-        back={{ href: "/plan", label: "Plan" }}
+        back={{ href: "/plan", label: "More" }}
         action={
           <Button onClick={() => openIncome(null)} className="h-10 rounded-xl">
             <Plus aria-hidden />

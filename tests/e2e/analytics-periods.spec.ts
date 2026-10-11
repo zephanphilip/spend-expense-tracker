@@ -18,8 +18,8 @@ test("analytics: week, month, year, rolling ranges and custom dates", async ({ p
 
   await page.goto("/analytics");
   const kpis = page.locator("dl").first();
-  await expect(kpis).toContainText("₹300"); // this month (default) …
-  if (lastWeek.getMonth() === now.getMonth()) await expect(kpis).toContainText("₹500");
+  // This month (default): last week's expense only counts when it falls in the same month.
+  await expect(kpis).toContainText(lastWeek.getMonth() === now.getMonth() ? "₹500" : "₹300");
 
   // Week: this week, step back to last week, and return.
   await kind(page, "Week").click();

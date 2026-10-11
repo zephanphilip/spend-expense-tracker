@@ -32,7 +32,7 @@ export function WishlistView() {
     <div className="space-y-5">
       <PageHeader
         title="Wishlist"
-        back={{ href: "/plan", label: "Plan" }}
+        back={{ href: "/plan", label: "More" }}
         action={
           <Button onClick={() => setAdding(true)} className="h-10 rounded-xl">
             <Plus aria-hidden />
