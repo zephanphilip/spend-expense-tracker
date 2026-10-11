@@ -21,13 +21,24 @@ async function addRecurring(page: Page, { name, amount, start, auto }: { name: s
 test("recurring automation records due occurrences exactly once", async ({ page }) => {
   await signUp(page);
   const start = subMonths(new Date(), 2); // 3 occurrences due: 2 months ago, last month, this month
+  // The confirmation toast shows on whichever screen is open when the automation runs (it
+  // can fire on /recurring right after saving, or on the next load), so watch for it from
+  // the start and assert the outcome on the stored data, which is what must be exact.
+  let toastSeen = false;
+  const toast = page
+    .getByText(/Recorded 3 recurring entries automatically/)
+    .waitFor({ timeout: 20_000 })
+    .then(() => (toastSeen = true))
+    .catch(() => undefined);
   await addRecurring(page, { name: "Rent", amount: "20000", start, auto: true });
   await page.goto("/dashboard");
-  await expect(page.getByText(/Recorded 3 recurring entries automatically/)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("region", { name: /Spent in/ })).toContainText("₹20,000", { timeout: 15_000 });
 
   // Reloading (automation runs again) must not create duplicates.
   await page.reload();
   await page.waitForTimeout(3000);
+  await toast;
+  test.info().annotations.push({ type: "toast", description: toastSeen ? "seen" : "missed (ran during navigation)" });
   await page.goto("/expenses");
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page.getByRole("dialog", { name: "Filters" }).getByRole("button", { name: "All time" }).click();

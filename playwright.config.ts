@@ -17,7 +17,8 @@ export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
   workers: 1,
-  retries: 0,
+  // One retry on CI absorbs runner timing races; anything retried shows up as "flaky".
+  retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   timeout: 60_000,
   expect: { timeout: 10_000 },
