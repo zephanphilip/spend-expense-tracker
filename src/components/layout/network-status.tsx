@@ -31,25 +31,33 @@ export function NetworkStatus() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     // Quick retries right after a change (the network often needs a moment after the
-    // "online" event), then a slow poll while still offline.
+    // "online" event), then a steady poll while still offline. Browsers don't reliably fire
+    // "online" when connectivity returns, so the poll (a tiny same-origin HEAD, only while
+    // offline) is what notices — keep it short.
     const RETRY_MS = [2_000, 5_000];
+    const POLL_MS = 5_000;
     const check = async (attempt = 0) => {
       if (timer) clearTimeout(timer);
       const ok = await probe();
       if (cancelled) return;
       setOnline(ok);
-      if (!ok) timer = setTimeout(() => void check(attempt + 1), RETRY_MS[attempt] ?? 30_000);
+      if (!ok) timer = setTimeout(() => void check(attempt + 1), RETRY_MS[attempt] ?? POLL_MS);
     };
     const onOnline = () => void check(0);
     const goOffline = () => setOnline(false);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void check(RETRY_MS.length);
+    };
     void check(RETRY_MS.length); // initial load: no fast retries needed
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", goOffline);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", goOffline);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
