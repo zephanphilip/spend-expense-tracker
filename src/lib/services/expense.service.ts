@@ -21,7 +21,7 @@ import { expenseEffects, expenseUpdateEffects, reverseEffects } from "@/lib/fina
 import { monthKey, monthRange } from "@/lib/months";
 
 import { expenseInputSchema } from "@/lib/validation/expense";
-import type { Expense, ExpenseInput, ExpenseQuery } from "@/types";
+import type { Expense, ExpenseInput, ExpenseQuery, MonthKey } from "@/types";
 
 import { mergeStatsDeltas, expenseStatsDelta, expenseUpdateStatsDeltas } from "@/lib/stats/monthly";
 
@@ -83,6 +83,23 @@ export function subscribeToExpenses(
     },
     onError,
   );
+}
+
+/**
+ * Every expense dated within `month` (by `occurredAt`), live — local writes included. For
+ * per-category totals that must match the stored records exactly (no aggregate, no limit).
+ */
+export function subscribeMonthExpenses(
+  uid: string,
+  month: MonthKey,
+  onData: (expenses: Expense[]) => void,
+  onError: (error: Error) => void,
+): () => void {
+  const { from, to } = monthRange(month);
+  const q = query(expensesCol(uid), where("occurredAt", ">=", Timestamp.fromDate(from)), where("occurredAt", "<=", Timestamp.fromDate(to))).withConverter(
+    expenseConverter,
+  );
+  return onSnapshot(q, (snap) => onData(snap.docs.map((d) => d.data())), onError);
 }
 
 export interface PendingWrite {

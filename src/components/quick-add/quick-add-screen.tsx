@@ -25,6 +25,7 @@ import {
   visibleSteps,
 } from "@/lib/quick-add/machine";
 import { consumeLaunch, DEFAULT_QUICK_ADD_PREFS, QUICK_ADD_PREFS_KEY, type QuickAddPreferences } from "@/lib/quick-add/preferences";
+import { categoryBudgetStatuses } from "@/lib/finance/budget";
 import { calculateCategoryBudgetStatus, createExpense } from "@/lib/services/expense.service";
 import { getErrorMessage } from "@/lib/services/errors";
 import { cn } from "@/lib/utils";
@@ -117,6 +118,24 @@ function QuickAddFlow({ params }: { params: URLSearchParams }) {
   const minor = amountMinor(state.draft, digits);
   const amountLabel = format(minor ?? 0);
   const category = state.draft.categoryId ? getCategory(state.draft.categoryId) : null;
+  // Where each category would stand this month with this expense in it (null until loaded).
+  const { ready: budgetReady, month: budgetMonth, budget: monthBudget, expenses: monthExpenses } = data.budget;
+  const budgetHints = useMemo(
+    () =>
+      budgetReady
+        ? {
+            statuses: categoryBudgetStatuses(
+              categories.map((c) => c.id),
+              budgetMonth,
+              monthBudget,
+              monthExpenses,
+              { amount: minor ?? 0 },
+            ),
+            anyLimits: Boolean(monthBudget && Object.keys(monthBudget.categories).length),
+          }
+        : null,
+    [budgetReady, budgetMonth, monthBudget, monthExpenses, categories, minor],
+  );
 
   // This visit counts as the app's launch, so "open into Quick Add" won't bounce us back here.
   // A consumed deep link is dropped from the URL so a reload resumes the persisted draft
@@ -316,7 +335,8 @@ function QuickAddFlow({ params }: { params: URLSearchParams }) {
             categories={categories}
             usage={usage}
             selectedId={state.draft.categoryId}
-            remainingByCategory={data.remainingByCategory}
+            budgetHints={budgetHints}
+            amountLabel={amountLabel}
             formatAmount={format}
             onPick={(categoryId) => {
               launcher.feedback("tap");
