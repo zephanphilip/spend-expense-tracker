@@ -57,7 +57,7 @@ export const PLAN_ITEMS: PlanItem[] = [
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: House },
   { href: "/expenses", label: "History", icon: ReceiptText },
-  { href: "/fitness", label: "Fitness", icon: Activity },
+  { href: "/activities", label: "Activities", icon: Activity, matches: ["/fitness"] },
   { href: "/plan", label: "More", icon: LayoutGrid, matches: PLAN_ITEMS.map((i) => i.href) },
 ];
 

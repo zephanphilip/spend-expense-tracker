@@ -476,15 +476,19 @@ Preferences are per device. *Push while the app is closed would need FCM + Cloud
 Route error boundary with retry, global error page, not-found page; Firebase Performance
 Monitoring (opt-in via env) for page-load and network traces.
 
-## Fitness (lite habit tracker)
+## Activities (general-purpose habit & session tracker)
 
 A separate domain under the same user: it never reads or writes money collections.
-Routes: `/fitness` (today + week strip), `/fitness/analytics`, `/fitness/activity?id=`.
-The bottom bar is Home · History · (+) · Fitness · More (the Plan hub, now also holding
+It started as a fitness tracker and was generalised without a data migration — see
+[`activity-tracker.md`](activity-tracker.md). The Firestore collections keep their original
+`fitness*` names on purpose (renaming would mean copying every document).
+Routes: `/activities` (today + week strip), `/activities/analytics`, `/activities/activity?id=`;
+the old `/fitness…` URLs redirect there with their query string.
+The bottom bar is Home · History · (+) · Activities · More (the Plan hub, now also holding
 Settings).
 
 ```
-users/{uid}/fitnessActivities/{id}  name, description, icon, color, startDate, endDate,
+users/{uid}/fitnessActivities/{id}  name, description, icon, color, category?, startDate, endDate,
                                     schedules[], reminderEnabled, reminderTime "HH:MM",
                                     targetDuration (min), targetQuantity, unit,
                                     multipleEntries, status active|paused|archived,
@@ -508,14 +512,14 @@ users/{uid}/fitnessLogs/{id}        activityId, date "YYYY-MM-DD", completedAt (
 * **Reads**: activities plus a rolling 400-day log window are live app-wide (no log listener
   until the first activity exists). Older analytics ranges and the month calendar open
   date-range queries; activity history is paginated (`activityId ASC, date DESC` index).
-* **Calculations** (`lib/fitness/stats.ts`, unit-tested): a day is done when ≥ 1 log exists.
+* **Calculations** (`lib/activities/stats.ts`, `totals.ts`, unit-tested): a day is done when ≥ 1 log exists.
   Completion rate = completed scheduled occurrences ÷ scheduled occurrences, excluding
   days before start/after end/while paused and unscheduled days. Today (and the current
   week of an "N times a week" activity) is pending — it never lowers a rate or breaks a
   streak, and counts once done. Streaks run over scheduled occurrences (weeks for "N times
   a week"); the overall streak is days in a row with any activity. Nothing derived is
   stored, so historical edits are reflected everywhere.
-* **Reminders** are in-app only (no push server/Cloud Functions): a banner on the Fitness tab
+* **Reminders** are in-app only (no push server/Cloud Functions): a banner on the Activities tab
   when a reminder time has passed and the activity is due and not done, plus an optional
   device notification (permission asked only when the user turns it on) shown while the app
   is open or the next time it's opened — once per activity per day. "Mark completed" is
@@ -523,5 +527,5 @@ users/{uid}/fitnessLogs/{id}        activityId, date "YYYY-MM-DD", completedAt (
   delivery while the app is closed would need Web Push from a scheduled Cloud Function
   (Blaze plan + VAPID keys) — not implemented.
 * **Offline**: writes go to Firestore's persistent cache and sync later; records waiting to
-  sync show a cloud icon (snapshot `hasPendingWrites`). Fitness data isn't included in JSON
-  backups yet.
+  sync show a cloud icon (snapshot `hasPendingWrites`). Activity data has its own
+  read-only JSON export on the Data page (with counts); it isn't part of the money backup.

@@ -4,7 +4,7 @@
  *  - Hashed build assets (/_next/static) and icons: cache-first (they're immutable).
  *  - Everything else (Firebase, APIs) is left alone; Firestore has its own offline cache.
  */
-const VERSION = "v4"; // bump when unhashed assets (icons) change
+const VERSION = "v5"; // bump when unhashed assets (icons) or the precache list change
 const PAGE_CACHE = `ledger-pages-${VERSION}`;
 const ASSET_CACHE = `ledger-assets-${VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -20,6 +20,7 @@ const PRECACHE = [
   "/plan",
   "/settings",
   "/analytics",
+  "/activities",
   "/login",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
@@ -109,7 +110,7 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// Reminder notifications: open (or focus) the relevant screen when tapped. Fitness
+// Reminder notifications: open (or focus) the relevant screen when tapped. Activity
 // reminders also offer a "Mark completed" action where the platform shows actions; the
 // app performs the write (it needs the signed-in session).
 self.addEventListener("notificationclick", (event) => {

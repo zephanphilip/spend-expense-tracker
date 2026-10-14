@@ -2,6 +2,7 @@
 
 import { PageHeader } from "@/components/common/page-header";
 
+import { ActivityExportPanel } from "./activity-export-panel";
 import { BackupPanel } from "./backup-panel";
 import { ExportPanel } from "./export-panel";
 import { ImportPanel } from "./import-panel";
@@ -13,6 +14,7 @@ export function DataView() {
       <ImportPanel />
       <ExportPanel />
       <BackupPanel />
+      <ActivityExportPanel />
     </div>
   );
 }

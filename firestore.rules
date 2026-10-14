@@ -672,7 +672,8 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // ================================================================ Fitness
+      // ================================================================ Activity tracker
+      // (stored in the original fitnessActivities / fitnessLogs collections)
       // Independent of the money ledger: no cross-document balance checks, just ownership
       // and schema validation.
 
@@ -680,8 +681,11 @@ service cloud.firestore {
         return value is string && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
       }
 
+      // Keys are append-only (stored on existing activities): the general-purpose ones were
+      // added when Fitness became the Activity tracker.
       function isFitnessIcon(fitnessIcon) {
-        return fitnessIcon in ['activity', 'run', 'walk', 'bike', 'gym', 'swim', 'hike', 'stretch', 'yoga', 'heart', 'flame', 'timer', 'water', 'meditate', 'read', 'sleep', 'moon', 'sun', 'food', 'vitamins', 'music', 'target', 'trophy'];
+        return fitnessIcon in ['activity', 'run', 'walk', 'bike', 'gym', 'swim', 'hike', 'stretch', 'yoga', 'heart', 'flame', 'timer', 'water', 'meditate', 'read', 'sleep', 'moon', 'sun', 'food', 'vitamins', 'music', 'target', 'trophy',
+          'code', 'terminal', 'laptop', 'database', 'study', 'book', 'briefcase', 'project', 'pen', 'brush', 'idea', 'language', 'rocket', 'coffee', 'calendar', 'check'];
       }
 
       function isFitnessColor(fitnessColor) {
@@ -704,10 +708,12 @@ service cloud.firestore {
       // ---------- users/{uid}/fitnessActivities/{activityId} ----------
 
       function isValidFitnessActivity(data) {
-        return data.keys().hasOnly(['name', 'description', 'icon', 'color', 'startDate', 'endDate', 'schedules', 'reminderEnabled', 'reminderTime', 'targetDuration', 'targetQuantity', 'unit', 'multipleEntries', 'status', 'createdAt', 'updatedAt'])
+        // `category` is optional (added later): older activities don't have it and stay valid.
+        return data.keys().hasOnly(['name', 'description', 'category', 'icon', 'color', 'startDate', 'endDate', 'schedules', 'reminderEnabled', 'reminderTime', 'targetDuration', 'targetQuantity', 'unit', 'multipleEntries', 'status', 'createdAt', 'updatedAt'])
           && data.keys().hasAll(['name', 'description', 'icon', 'color', 'startDate', 'endDate', 'schedules', 'reminderEnabled', 'reminderTime', 'targetDuration', 'targetQuantity', 'unit', 'multipleEntries', 'status', 'createdAt', 'updatedAt'])
           && isName(data.name, 40)
           && data.description is string && data.description.size() <= 140
+          && (!('category' in data) || isName(data.category, 24))
           && isFitnessIcon(data.icon)
           && isFitnessColor(data.color)
           && isDateKey(data.startDate)
