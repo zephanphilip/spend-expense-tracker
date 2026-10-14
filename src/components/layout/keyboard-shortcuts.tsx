@@ -11,14 +11,14 @@ export const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["/"], label: "Search history" },
   { keys: ["G", "H"], label: "Go to Home" },
   { keys: ["G", "E"], label: "Go to History (expenses)" },
-  { keys: ["G", "F"], label: "Go to Fitness" },
+  { keys: ["G", "T"], label: "Go to Activities (tracker)" },
   { keys: ["G", "P"], label: "Go to More" },
   { keys: ["G", "A"], label: "Go to Analytics" },
   { keys: ["G", "S"], label: "Go to Settings" },
   { keys: ["?"], label: "Show this list" },
 ];
 
-const GO: Record<string, string> = { h: "/dashboard", e: "/expenses", f: "/fitness", p: "/plan", a: "/analytics", s: "/settings" };
+const GO: Record<string, string> = { h: "/dashboard", e: "/expenses", t: "/activities", p: "/plan", a: "/analytics", s: "/settings" };
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

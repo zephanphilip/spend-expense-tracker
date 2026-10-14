@@ -6,8 +6,8 @@ import { Suspense } from "react";
 
 import { AccountDetailView } from "@/components/accounts/account-detail-view";
 import { EmptyState } from "@/components/common/empty-state";
+import { ActivityDetailView } from "@/components/activities/activity-detail-view";
 import { EmiDetailView } from "@/components/emis/emi-detail-view";
-import { ActivityDetailView } from "@/components/fitness/activity-detail-view";
 import { InvestmentDetailView } from "@/components/investments/investment-detail-view";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GoalDetailView } from "@/components/wishlist/goal-detail-view";
@@ -17,7 +17,7 @@ const views = {
   account: (id: string) => <AccountDetailView accountId={id} />,
   investment: (id: string) => <InvestmentDetailView investmentId={id} />,
   goal: (id: string) => <GoalDetailView goalId={id} />,
-  fitnessActivity: (id: string) => <ActivityDetailView activityId={id} />,
+  activity: (id: string) => <ActivityDetailView activityId={id} />,
 };
 
 function Inner({ view }: { view: keyof typeof views }) {

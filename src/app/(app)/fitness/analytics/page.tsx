@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 
-import { FitnessAnalyticsView } from "@/components/fitness/fitness-analytics-view";
+import { LegacyRedirect } from "@/components/common/legacy-redirect";
+import { LEGACY_ACTIVITY_PATHS } from "@/lib/activities/routes";
 
-export const metadata: Metadata = { title: "Fitness analytics" };
+export const metadata: Metadata = { title: "Activity analytics" };
 
-export default function FitnessAnalyticsPage() {
-  return <FitnessAnalyticsView />;
+/** Old /fitness URL — kept so bookmarks and notifications still work. */
+export default function LegacyPage() {
+  return <LegacyRedirect to={LEGACY_ACTIVITY_PATHS["/fitness/analytics"]} />;
 }

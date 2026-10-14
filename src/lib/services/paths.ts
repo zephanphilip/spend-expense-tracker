@@ -51,7 +51,8 @@ export const monthlyStatsDoc = (uid: string, month: string) => sub(uid, "monthly
 export const importsCol = (uid: string) => subCol(uid, "imports");
 export const importDoc = (uid: string, id: string) => sub(uid, "imports", id);
 
-// Fitness (independent of the money collections)
+// Activity tracker (independent of the money collections). The collections keep their original
+// "fitness" names: renaming would mean copying every record; see docs/activity-tracker.md.
 export const fitnessActivitiesCol = (uid: string) => subCol(uid, "fitnessActivities");
 export const fitnessActivityDoc = (uid: string, id: string) => sub(uid, "fitnessActivities", id);
 export const fitnessLogsCol = (uid: string) => subCol(uid, "fitnessLogs");

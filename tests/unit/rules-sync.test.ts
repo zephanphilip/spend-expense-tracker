@@ -8,7 +8,7 @@ import { CURRENCY_CODES } from "@/lib/constants/currencies";
 import { CATEGORY_ICON_KEYS } from "@/lib/constants/icons";
 import { PAYMENT_METHODS } from "@/lib/constants/payment-methods";
 import { DEFAULT_CATEGORIES } from "@/lib/constants/categories";
-import { FITNESS_ICON_KEYS, FITNESS_STATUSES, SCHEDULE_KINDS } from "@/lib/constants/fitness";
+import { ACTIVITY_ICON_KEYS, ACTIVITY_STATUSES, SCHEDULE_KINDS } from "@/lib/constants/activities";
 
 const rules = readFileSync(join(process.cwd(), "firestore.rules"), "utf8");
 
@@ -32,11 +32,14 @@ describe("firestore.rules stays in sync with app constants", () => {
   it("currencies", () => {
     expect(listAfter("data.currency").sort()).toEqual([...CURRENCY_CODES].sort());
   });
-  it("fitness icons, colours, schedules and statuses", () => {
-    expect(listAfter("fitnessIcon").sort()).toEqual([...FITNESS_ICON_KEYS].sort());
+  it("activity icons, colours, schedules and statuses", () => {
+    expect(listAfter("fitnessIcon").sort()).toEqual([...ACTIVITY_ICON_KEYS].sort());
+    // Icon keys are stored on existing activities: the original (Fitness-era) keys must never go.
+    const original = ["activity", "run", "walk", "bike", "gym", "swim", "hike", "stretch", "yoga", "heart", "flame", "timer", "water", "meditate", "read", "sleep", "moon", "sun", "food", "vitamins", "music", "target", "trophy"];
+    for (const key of original) expect(ACTIVITY_ICON_KEYS).toContain(key);
     expect(listAfter("fitnessColor").sort()).toEqual([...CATEGORY_COLOR_KEYS].sort());
     expect(listAfter("rule.kind").sort()).toEqual([...SCHEDULE_KINDS].sort());
-    expect(rules).toContain(`data.status in [${FITNESS_STATUSES.map((s) => `'${s}'`).join(", ")}]`);
+    expect(rules).toContain(`data.status in [${ACTIVITY_STATUSES.map((s) => `'${s}'`).join(", ")}]`);
   });
   it("default categories use valid icons/colors and unique ids", () => {
     const ids = DEFAULT_CATEGORIES.map((c) => c.id);

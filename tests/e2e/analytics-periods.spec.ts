@@ -50,8 +50,8 @@ test("analytics: week, month, year, rolling ranges and custom dates", async ({ p
 
   // Custom dates: just last week's day.
   await kind(page, "Custom").click();
-  await page.getByLabel("From").fill(format(lastWeek, "yyyy-MM-dd"));
-  await page.getByLabel("To").fill(format(lastWeek, "yyyy-MM-dd"));
+  await page.getByLabel("From", { exact: true }).fill(format(lastWeek, "yyyy-MM-dd"));
+  await page.getByLabel("To", { exact: true }).fill(format(lastWeek, "yyyy-MM-dd"));
   await expect(kpis).toContainText("₹200");
   await expect(page.getByText("Computed from individual expenses in this period.")).toBeVisible();
 });
