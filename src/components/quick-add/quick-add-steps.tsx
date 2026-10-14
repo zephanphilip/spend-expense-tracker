@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { PAYMENT_METHOD_META, type PaymentMethod } from "@/lib/constants/payment-methods";
 import { type ExpenseUsage, rankByUsage, rankPaymentMethods, recentIds } from "@/lib/expense-preferences";
 import { formatMonth, monthKey } from "@/lib/months";
+import type { CategoryBudgetStatus } from "@/lib/finance/budget";
 import type { BudgetOutcome, QuickAddDraft, SavedExpense } from "@/lib/quick-add/machine";
 import { cn } from "@/lib/utils";
 import { NOTE_MAX_LENGTH } from "@/lib/validation/expense";
@@ -95,27 +96,35 @@ export function AmountStep({
 
 // ── Category ────────────────────────────────────────────────────────────────────────────
 
+/** "₹x left" / "₹x over" (after this expense), "No budget", or nothing while loading. */
+export function categoryBudgetHint(
+  status: CategoryBudgetStatus | undefined,
+  anyLimits: boolean,
+  formatAmount: (minor: number) => string,
+): { text: string; over: boolean } | null {
+  if (!status) return null;
+  const p = status.progress;
+  if (!p) return anyLimits ? { text: "No budget", over: false } : null;
+  return p.remaining >= 0 ? { text: `${formatAmount(p.remaining)} left`, over: false } : { text: `${formatAmount(-p.remaining)} over`, over: true };
+}
+
 function CategoryTile({
   category,
-  remaining,
-  formatAmount,
+  hint,
   selected,
   onPick,
 }: {
   category: Category;
-  remaining: number | undefined;
-  formatAmount: (minor: number) => string;
+  hint: { text: string; over: boolean } | null;
   selected: boolean;
   onPick: (id: string) => void;
 }) {
-  const hint =
-    remaining === undefined ? null : remaining >= 0 ? `${formatAmount(remaining)} left` : `${formatAmount(-remaining)} over`;
   return (
     <button
       type="button"
       onClick={() => onPick(category.id)}
       aria-pressed={selected}
-      aria-label={hint ? `${category.name}, ${hint}` : category.name}
+      aria-label={hint ? `${category.name}, ${hint.text}` : category.name}
       className={cn(
         "flex min-h-[5.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl bg-muted/50 px-1 py-2 text-center outline-none transition-transform active:scale-95",
         "focus-visible:ring-3 focus-visible:ring-ring/50",
@@ -125,9 +134,7 @@ function CategoryTile({
       <CategoryIcon category={category} size="md" />
       <span className="w-full truncate text-sm font-medium">{category.name}</span>
       {hint ? (
-        <span className={cn("w-full truncate text-[11px] tabular-nums", remaining! < 0 ? "text-destructive" : "text-muted-foreground")}>
-          {hint}
-        </span>
+        <span className={cn("w-full truncate text-[11px] tabular-nums", hint.over ? "text-destructive" : "text-muted-foreground")}>{hint.text}</span>
       ) : null}
     </button>
   );
@@ -137,14 +144,17 @@ export function CategoryStep({
   categories,
   usage,
   selectedId,
-  remainingByCategory,
+  budgetHints,
+  amountLabel,
   formatAmount,
   onPick,
 }: {
   categories: readonly Category[];
   usage: ExpenseUsage;
   selectedId: string | null;
-  remainingByCategory: Map<string, number>;
+  /** This month's budget position per category, counting this expense; null while loading. */
+  budgetHints: { statuses: Map<string, CategoryBudgetStatus>; anyLimits: boolean } | null;
+  amountLabel: string;
   formatAmount: (minor: number) => string;
   onPick: (id: string) => void;
 }) {
@@ -164,7 +174,9 @@ export function CategoryStep({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 space-y-3 px-[max(1rem,env(safe-area-inset-left))] pb-3">
-        <StepTitle id="step-title">Category</StepTitle>
+        <StepTitle id="step-title" hint={budgetHints?.anyLimits ? `Budget left this month after ${amountLabel}` : undefined}>
+          Category
+        </StepTitle>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input
@@ -217,8 +229,7 @@ export function CategoryStep({
                 <CategoryTile
                   key={c.id}
                   category={c}
-                  remaining={remainingByCategory.get(c.id)}
-                  formatAmount={formatAmount}
+                  hint={budgetHints ? categoryBudgetHint(budgetHints.statuses.get(c.id), budgetHints.anyLimits, formatAmount) : null}
                   selected={c.id === selectedId}
                   onPick={onPick}
                 />

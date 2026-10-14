@@ -1,9 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
+import { format, setDate, subMonths } from "date-fns";
 
 import { addExpense, PASSWORD, sheet, signUp, uniqueEmail } from "./helpers";
 
 /** Grid tile (not the "…, recent" chip) for a category. */
-const tile = (page: Page, name: string) => page.getByRole("button", { name: new RegExp(`^${name}(, ₹|$)`) });
+const tile = (page: Page, name: string) => page.getByRole("button", { name: new RegExp(`^${name}(, (₹|No budget)|$)`) });
 const quickAddMain = (page: Page) => page.locator("main");
 
 async function setCategoryBudget(page: Page, limits: Record<string, string>) {
@@ -55,6 +56,86 @@ test("quick add: sequential flow and budget remaining / exceeded / none", async 
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/expenses");
   await expect(page.getByText(/4 expenses · ₹8,530/)).toBeVisible();
+});
+
+/** Overwrites this month's stored per-category aggregate (as a stale/partial one would be). */
+async function corruptMonthlyAggregate(email: string, byCategory: Record<string, number>) {
+  const auth = await fetch("http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-api-key", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: PASSWORD, returnSecureToken: true }),
+  }).then((r) => r.json() as Promise<{ localId: string }>);
+  const month = format(new Date(), "yyyy-MM");
+  const fields = Object.fromEntries(Object.entries(byCategory).map(([k, v]) => [k, { integerValue: String(v) }]));
+  const res = await fetch(
+    `http://127.0.0.1:8080/v1/projects/demo-ledger/databases/(default)/documents/users/${auth.localId}/monthlyStats/${month}?updateMask.fieldPaths=byCategory`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer owner" },
+      body: JSON.stringify({ fields: { byCategory: { mapValue: { fields } } } }),
+    },
+  );
+  expect(res.ok).toBe(true);
+}
+
+test("quick add: category hints use this month's stored expenses, include this amount, ignore card payments", async ({ page }) => {
+  const { email } = await signUp(page);
+  // A card with a bank to pay it from.
+  for (const a of [
+    { type: "Bank", name: "HDFC", balance: "50000" },
+    { type: "Card", name: "Amex", limit: "100000" },
+  ] as const) {
+    await page.goto("/accounts");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const s = page.getByRole("dialog", { name: "Add account" });
+    await s.getByRole("radiogroup", { name: "Account type" }).getByText(a.type, { exact: true }).click();
+    await s.getByLabel("Name").fill(a.name);
+    if (a.type === "Bank") await s.getByLabel(/Current balance/).fill(a.balance);
+    else await s.getByLabel("Credit limit").fill(a.limit);
+    await s.getByRole("button", { name: "Add account" }).click();
+    await expect(s).toBeHidden();
+  }
+  await page.goto("/dashboard");
+  await addExpense(page, { amount: "1500", category: "Food", method: "Credit" }); // on the card
+  await addExpense(page, { amount: "1000", category: "Food", method: "Cash" });
+  // Last month's spending doesn't count against this month.
+  const lastMonth = setDate(subMonths(new Date(), 1), 15);
+  await addExpense(page, { amount: "3000", category: "Food", method: "Cash", when: format(lastMonth, "yyyy-MM-dd'T'12:00") });
+  // Paying the card bill is a transfer, not more Food spending.
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Pay card" }).click();
+  const pay = page.getByRole("dialog", { name: "Pay Amex" });
+  await pay.getByRole("button", { name: /Full outstanding/ }).click();
+  await pay.getByRole("button", { name: "Record payment" }).click();
+  await expect(page.getByText("₹1,500 paid to Amex")).toBeVisible();
+  await setCategoryBudget(page, { Food: "8000" });
+  // The hints must not depend on the derived aggregate (it used to show the full ₹8,000).
+  await corruptMonthlyAggregate(email, { food: 0 });
+
+  await page.goto("/quick-add");
+  await page.getByLabel("Amount").fill("500");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Budget left this month after ₹500")).toBeVisible();
+  // ₹8,000 − (₹1,500 card + ₹1,000 cash + ₹500 this one) = ₹5,000.
+  await expect(tile(page, "Food")).toHaveAccessibleName("Food, ₹5,000 left");
+  await expect(tile(page, "Transport")).toHaveAccessibleName("Transport, No budget");
+
+  // A bigger amount flips to over budget; the saved result agrees with the hint.
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByLabel("Amount").fill("6000");
+  await page.keyboard.press("Enter");
+  await expect(tile(page, "Food")).toHaveAccessibleName("Food, ₹500 over");
+  await tile(page, "Food").click();
+  await page.getByRole("button", { name: "Skip" }).click();
+  await page.getByRole("button", { name: /^UPI/ }).click();
+  await page.getByRole("button", { name: "Add expense" }).click();
+  await expect(quickAddMain(page)).toContainText("₹500 over budget");
+
+  // The new expense is counted for the next one straight away (live, not cached).
+  await page.getByRole("button", { name: "Add another" }).click();
+  await page.getByLabel("Amount").fill("100");
+  await page.keyboard.press("Enter");
+  await expect(tile(page, "Food")).toHaveAccessibleName("Food, ₹600 over");
 });
 
 test("quick add: back navigation keeps data; one-tap save; frequent choices first", async ({ page }) => {

@@ -102,3 +102,27 @@ export function sumCategorySpend(
   if (include && !seen && include.categoryId === categoryId) total += include.amount;
   return total;
 }
+
+/**
+ * Budget position of every category for one month, from the month's stored expenses — the
+ * same `sumCategorySpend` + `categoryBudgetStatus` used after saving, so a hint shown before
+ * saving matches the result shown after it.
+ *
+ * `pending` is the expense being added or edited: its amount is counted in whichever
+ * category it would go to (each category's status answers "if it went here"), and when
+ * editing (`id` set) the stored copy is left out so it isn't counted twice. Only EXPENSE
+ * records belong in `expenses`: card bill payments are transfers and never count.
+ */
+export function categoryBudgetStatuses(
+  categoryIds: readonly string[],
+  month: MonthKey,
+  budget: Pick<Budget, "month" | "categories"> | null,
+  expenses: readonly { id: string; amount: number; categoryId: string }[],
+  pending?: { amount: number; id?: string },
+): Map<string, CategoryBudgetStatus> {
+  const counted = pending?.id ? expenses.filter((e) => e.id !== pending.id) : expenses;
+  const extra = pending && pending.amount > 0 ? pending.amount : 0;
+  const out = new Map<string, CategoryBudgetStatus>();
+  for (const id of categoryIds) out.set(id, categoryBudgetStatus(id, month, budget, sumCategorySpend(counted, id) + extra));
+  return out;
+}

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_CATEGORIES } from "@/lib/constants/categories";
 import { nextUsage, rankByUsage, rankPaymentMethods, recentIds, type ExpenseUsage } from "@/lib/expense-preferences";
-import { categoryBudgetStatus, sumCategorySpend } from "@/lib/finance/budget";
+import { categoryBudgetStatus, categoryBudgetStatuses, sumCategorySpend } from "@/lib/finance/budget";
+import { categoryBudgetHint } from "@/components/quick-add/quick-add-steps";
 import { draftFromSearchParams, hasLinkParams, quickAddUrl } from "@/lib/quick-add/deep-link";
 import { getQuickExpenseLauncher } from "@/lib/quick-add/launcher";
 import {
@@ -225,6 +226,45 @@ describe("category budget status", () => {
       state: "over",
       percent: 145,
     });
+  });
+});
+
+describe("category budget hints (Quick Add)", () => {
+  const budget = { month: "2026-09", categories: { food: 800000, fuel: 0 } };
+  const month = [
+    { id: "card", amount: 150000, categoryId: "food" }, // paid by credit card (the bill payment is a transfer, not here)
+    { id: "cash", amount: 100000, categoryId: "food" },
+    { id: "f", amount: 2000, categoryId: "fuel" },
+  ];
+
+  it("subtracts the month's spend plus the amount being added, per category", () => {
+    const s = categoryBudgetStatuses(["food", "fuel", "transport"], "2026-10", budget, month, { amount: 50000 });
+    expect(s.get("food")?.progress).toMatchObject({ limit: 800000, spent: 300000, remaining: 500000 });
+    expect(s.get("fuel")?.progress).toMatchObject({ remaining: -52000, state: "over" }); // 0 limit is a budget
+    expect(s.get("transport")).toMatchObject({ progress: null, budgetMonth: "2026-09", spent: 50000 });
+    // Budgets roll forward: September's limits apply to October.
+    expect(s.get("food")?.month).toBe("2026-10");
+  });
+
+  it("without an amount yet, shows the position before this expense", () => {
+    const s = categoryBudgetStatuses(["food"], "2026-10", budget, month);
+    expect(s.get("food")?.progress?.remaining).toBe(550000);
+  });
+
+  it("editing counts the expense once, at its new amount", () => {
+    const s = categoryBudgetStatuses(["food"], "2026-10", budget, month, { id: "cash", amount: 40000 });
+    expect(s.get("food")?.progress?.spent).toBe(190000);
+  });
+
+  it("formats left / over / no budget, and nothing when no limits exist", () => {
+    const fmt = (m: number) => `₹${m / 100}`;
+    const s = categoryBudgetStatuses(["food", "transport"], "2026-10", budget, month, { amount: 600000 });
+    expect(categoryBudgetHint(s.get("food"), true, fmt)).toEqual({ text: "₹500 over", over: true });
+    expect(categoryBudgetHint(s.get("transport"), true, fmt)).toEqual({ text: "No budget", over: false });
+    expect(categoryBudgetHint(s.get("transport"), false, fmt)).toBeNull();
+    expect(categoryBudgetHint(undefined, true, fmt)).toBeNull();
+    const exact = categoryBudgetStatuses(["food"], "2026-10", budget, month, { amount: 550000 });
+    expect(categoryBudgetHint(exact.get("food"), true, fmt)).toEqual({ text: "₹0 left", over: false });
   });
 });
 
