@@ -43,6 +43,10 @@ describe("summarizeDashboard", () => {
     expect(summary.monthCount).toBe(4);
   });
 
+  it("month-to-date leaves out expenses dated later this month", () => {
+    expect(summary.monthToDate).toBe(35000);
+  });
+
   it("excludes future-dated expenses from the daily average", () => {
     expect(summary.dailyAverage).toBe(Math.round(35000 / 6));
   });

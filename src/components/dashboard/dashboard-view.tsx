@@ -19,9 +19,10 @@ import { ErrorState } from "@/components/common/error-state";
 import { ExpenseListItem } from "@/components/expenses/expense-list-item";
 import { Button } from "@/components/ui/button";
 import { useExpenses } from "@/hooks/use-expenses";
+import { useLocalDay } from "@/hooks/use-local-day";
 import { useIncomesForMonths } from "@/hooks/use-finance-queries";
 import { sumAmounts, summarizeDashboard } from "@/lib/analytics";
-import { budgetProgress, effectiveBudget } from "@/lib/finance/budget";
+import { budgetProgress, dailyAllowance, effectiveBudget } from "@/lib/finance/budget";
 import { goalProgress } from "@/lib/finance/goals";
 import { monthKey } from "@/lib/months";
 import { useSession } from "@/providers/auth-provider";
@@ -33,6 +34,7 @@ import { ReminderBell } from "@/components/reminders/reminder-center";
 import { CategoryBreakdown } from "./category-breakdown";
 import { DailySpending } from "./daily-spending";
 import { DashboardSkeleton } from "./dashboard-skeleton";
+import { SafeToSpendCard } from "./safe-to-spend-card";
 import { SpendingHero } from "./spending-hero";
 
 /** Upper bound for one month of personal expenses; totals are flagged if exceeded. */
@@ -49,7 +51,8 @@ function greeting(date: Date): string {
 export function DashboardView() {
   const { user, profile } = useSession();
   const { openCreate } = useExpenseSheet();
-  const [now] = useState(() => new Date());
+  // Follows the local calendar day, so a dashboard left open rolls into the next day/month.
+  const { now } = useLocalDay();
 
   // One query covers both "this month" and "last 7 days" (which may cross into last month).
   const range = useMemo(
@@ -79,6 +82,7 @@ export function DashboardView() {
   const monthIncome = sumAmounts((incomes.data ?? []).filter((i) => i.forMonth === month));
   const budget = budgets.data ? effectiveBudget(budgets.data, month)?.budget ?? null : null;
   const overallProgress = summary && budget?.overall ? budgetProgress(budget.overall, summary.month) : null;
+  const allowance = summary && budget && typeof budget.overall === "number" ? dailyAllowance(budget.overall, summary.monthToDate, now) : null;
   const spentByCategory = new Map(summary?.byCategory.map((c) => [c.categoryId, c.total]) ?? []);
   const activeGoals = (goals.data ?? []).filter((g) => g.status === "active" && !goalProgress(g).achieved).slice(0, 2);
   const hasAnything = (result.status === "success" && result.expenses.length > 0) || monthIncome > 0;
@@ -129,6 +133,7 @@ export function DashboardView() {
         ) : (
           <>
             <SpendingHero summary={summary} month={now} income={monthIncome} budget={overallProgress} />
+            {budget ? <SafeToSpendCard allowance={allowance} today={now} laterThisMonth={summary.month - summary.monthToDate} /> : null}
             <Link
               href="/analytics"
               className="flex items-center gap-3 rounded-3xl border bg-card p-4 text-sm outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"

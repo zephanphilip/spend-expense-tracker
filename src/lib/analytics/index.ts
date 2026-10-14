@@ -92,6 +92,8 @@ export interface DashboardSummary {
   todayCount: number;
   month: number;
   monthCount: number;
+  /** Spent this month up to the end of today (the month total minus anything dated later). */
+  monthToDate: number;
   /** Month total divided by the days elapsed so far this month. */
   dailyAverage: number;
   byCategory: CategoryTotal[];
@@ -112,6 +114,7 @@ export function summarizeDashboard(
     todayCount: todayExpenses.length,
     month,
     monthCount: monthExpenses.length,
+    monthToDate,
     dailyAverage: Math.round(monthToDate / now.getDate()),
     byCategory: totalsByCategory(monthExpenses),
     last7Days: dailyTotals(expenses, 7, now),
