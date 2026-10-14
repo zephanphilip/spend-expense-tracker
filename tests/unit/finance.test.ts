@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { budgetProgress, effectiveBudget } from "@/lib/finance/budget";
+import { budgetProgress, dailyAllowance, effectiveBudget } from "@/lib/finance/budget";
 import { computeEmi, emiOverview, obligationForMonth, obligationsForMonth, splitNextInstallment } from "@/lib/finance/emi";
 import { goalProgress } from "@/lib/finance/goals";
 import { pendingRecurring, recurringIncomeId, salaryStats } from "@/lib/finance/income";
@@ -211,5 +211,33 @@ describe("emiFormSchema", () => {
     expect(bad.error?.issues[0].path).toEqual(["startOn"]);
     const ok = emiFormSchema.safeParse({ ...base, startOn: iso(new Date(today.getFullYear() - 1, today.getMonth(), 1)) });
     expect(ok.success).toBe(true);
+  });
+});
+
+describe("dailyAllowance (safe to spend today)", () => {
+  it("spreads what's left over the days remaining, today included", () => {
+    // ₹30,000 budget, ₹12,000 spent by 14 Oct → ₹18,000 over 18 days (14th–31st) = ₹1,000/day.
+    const a = dailyAllowance(3000000, 1200000, new Date(2026, 9, 14, 21, 30));
+    expect(a).toMatchObject({ limit: 3000000, spent: 1200000, remaining: 1800000, daysLeft: 18, perDay: 100000 });
+    expect(a.progress).toMatchObject({ percent: 40, state: "ok" });
+  });
+
+  it("handles month boundaries: first day, last day, February", () => {
+    expect(dailyAllowance(3100, 0, new Date(2026, 9, 1, 0, 0)).daysLeft).toBe(31);
+    expect(dailyAllowance(3100, 100, new Date(2026, 9, 31, 23, 59))).toMatchObject({ daysLeft: 1, perDay: 3000 });
+    expect(dailyAllowance(2800, 0, new Date(2026, 1, 1)).daysLeft).toBe(28);
+    expect(dailyAllowance(2900, 0, new Date(2028, 1, 1)).daysLeft).toBe(29); // leap year
+  });
+
+  it("never goes negative when overspent, and treats a zero budget as nothing to spend", () => {
+    expect(dailyAllowance(100000, 130000, new Date(2026, 9, 20))).toMatchObject({ remaining: -30000, perDay: 0 });
+    expect(dailyAllowance(100000, 130000, new Date(2026, 9, 20)).progress.state).toBe("over");
+    expect(dailyAllowance(0, 0, new Date(2026, 9, 20))).toMatchObject({ remaining: 0, perDay: 0 });
+    expect(dailyAllowance(0, 500, new Date(2026, 9, 20)).progress).toMatchObject({ state: "over", percent: 100 });
+  });
+
+  it("rounds down to a whole minor unit so it never overstates", () => {
+    // ₹100.00 over 3 days → ₹33.33/day, not ₹33.34.
+    expect(dailyAllowance(10000, 0, new Date(2026, 8, 28)).perDay).toBe(3333);
   });
 });

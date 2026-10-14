@@ -1,3 +1,5 @@
+import { getDaysInMonth } from "date-fns";
+
 import type { Budget, MonthKey } from "@/types";
 
 export type BudgetState = "ok" | "warning" | "over";
@@ -125,4 +127,37 @@ export function categoryBudgetStatuses(
   const out = new Map<string, CategoryBudgetStatus>();
   for (const id of categoryIds) out.set(id, categoryBudgetStatus(id, month, budget, sumCategorySpend(counted, id) + extra));
   return out;
+}
+
+/** What can be spent per day for the rest of the month without going over the overall budget. */
+export interface DailyAllowance {
+  /** Overall monthly budget, minor units. */
+  limit: number;
+  /** Spent this month up to and including today. */
+  spent: number;
+  /** limit − spent; negative when overspent. */
+  remaining: number;
+  /** Calendar days left in the month, today included (≥ 1). */
+  daysLeft: number;
+  /** max(0, remaining) ÷ daysLeft, rounded down to a whole minor unit (never overstates). */
+  perDay: number;
+  progress: BudgetProgress;
+}
+
+/**
+ * `perDay = max(0, limit − spentToDate) ÷ days left in the month (today included)`.
+ * `today` is a local date, so the month and day count follow the device's time zone.
+ * A limit of 0 is a real budget (nothing is safe to spend), unlike no budget at all.
+ */
+export function dailyAllowance(limit: number, spentToDate: number, today: Date): DailyAllowance {
+  const daysLeft = getDaysInMonth(today) - today.getDate() + 1;
+  const remaining = limit - spentToDate;
+  return {
+    limit,
+    spent: spentToDate,
+    remaining,
+    daysLeft,
+    perDay: Math.floor(Math.max(0, remaining) / daysLeft),
+    progress: budgetProgress(limit, spentToDate),
+  };
 }
